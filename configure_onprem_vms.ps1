@@ -1,5 +1,5 @@
 Import-Module Az.Compute
-Import-Module Az.Account
+Import-Module Az.Accounts
 
 Connect-AzAccount -Identity
 
