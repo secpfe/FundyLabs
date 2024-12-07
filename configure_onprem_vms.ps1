@@ -66,7 +66,7 @@ Function Invoke-DomainJoinWithRetry {
     $success = $false
 
     while ($attempt -le $MaxAttempts -and -not $success) {
-        Write-Host "Attempt $attempt to join $VMName to the domain..."
+        Write-Output "Attempt $attempt to join $VMName to the domain..."
 
         try {
             $result = Invoke-AzVMRunCommand -ResourceGroupName $ResourceGroupName -VMName $VMName `
@@ -76,26 +76,26 @@ Function Invoke-DomainJoinWithRetry {
             $errorMessage = $result.Value[1].Message
             if (![string]::IsNullOrEmpty($errorMessage)) {
                 # An error occurred
-                Write-Host "Error occurred: $errorMessage"
+                Write-Output "Error occurred: $errorMessage"
                 if ($attempt -lt $MaxAttempts) {
-                    Write-Host "Waiting for 2 minutes before retrying..."
+                    Write-Output "Waiting for 2 minutes before retrying..."
                     Start-Sleep -Seconds $WaitTime
                 } else {
-                    Write-Host "Maximum attempts reached. Could not join $VMName to the domain."
+                    Write-Output "Maximum attempts reached. Could not join $VMName to the domain."
                 }
             } else {
                 # No error message, assume success
-                Write-Host "$VMName successfully joined to the domain."
+                Write-Output "$VMName successfully joined to the domain."
                 $success = $true
             }
         } catch {
             # Handle any exceptions from Invoke-AzVMRunCommand
-            Write-Host "An error occurred while executing the command: $_"
+            Write-Output "An error occurred while executing the command: $_"
             if ($attempt -lt $MaxAttempts) {
-                Write-Host "Waiting for 2 minutes before retrying..."
+                Write-Output "Waiting for 2 minutes before retrying..."
                 Start-Sleep -Seconds $WaitTime
             } else {
-                Write-Host "Maximum attempts reached. Could not join $VMName to the domain."
+                Write-Output "Maximum attempts reached. Could not join $VMName to the domain."
             }
         }
 
