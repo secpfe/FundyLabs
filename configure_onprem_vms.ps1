@@ -107,3 +107,159 @@ Function Invoke-DomainJoinWithRetry {
 foreach ($vmName in $vmNames) {
     Invoke-DomainJoinWithRetry -ResourceGroupName $resourceGroupName -VMName $vmName -Script $domainJoinScript
 }
+
+# Post-reboot Script to Configure DNS Forwarders
+$dnsForwarderScript = @"
+# Ensure DNS Server module is available
+Import-Module DNSServer
+
+# Add a forwarder to Google Public DNS
+Add-DnsServerForwarder -IPAddress "8.8.8.8"
+"@
+
+# Run the DNS forwarder configuration script on the DC VM
+Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $dnsForwarderScript
+
+
+
+
+
+# Start DCR onboarding
+Import-Module Az.Monitor
+
+# Variables
+$resourceGroupName = "CyberSOC"
+$workspaceName = "CyberSOCWS"
+$dcrName = "Minimal-Servers"
+
+# Get the resource group location
+$resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
+if (!$resourceGroup) {
+    Write-Output "Resource group '$resourceGroupName' not found." -ForegroundColor Red
+    exit
+}
+
+$location = $resourceGroup.Location
+
+# Retrieve the Log Analytics Workspace details
+$workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName -Name $workspaceName
+if (!$workspace) {
+    Write-Output "Log Analytics Workspace '$workspaceName' not found in Resource Group '$resourceGroupName'" -ForegroundColor Red
+    exit
+}
+
+# Prepare DCR details
+$workspaceResourceId = $workspace.ResourceId
+$workspaceId = $workspace.CustomerId
+#$subscriptionId=(Get-AzContext).Subscription.Id
+
+# Define the DCR object
+# Construct JSON as a raw string
+# Construct JSON as a raw string (without apiVersion)
+$jsonContent = @"
+{
+    "kind": "Windows",
+    "location": "$location",
+    "tags": {
+        "createdBy": "Sentinel"
+    },
+    "properties": {
+        "dataSources": {
+            "windowsEventLogs": [
+                {
+                    "streams": [
+                        "Microsoft-SecurityEvent"
+                    ],
+                    "xPathQueries": [
+                        "Security!*[System[(EventID=1102) or (EventID=4624) or (EventID=4625) or (EventID=4657) or (EventID=4663) or (EventID=4688) or (EventID=4700) or (EventID=4702) or (EventID=4719) or (EventID=4720) or (EventID=4722) or (EventID=4723) or (EventID=4724) or (EventID=4727) or (EventID=4728)]]",
+                        "Security!*[System[(EventID=4732) or (EventID=4735) or (EventID=4737) or (EventID=4739) or (EventID=4740) or (EventID=4754) or (EventID=4755) or (EventID=4756) or (EventID=4767) or (EventID=4799) or (EventID=4825) or (EventID=4946) or (EventID=4948) or (EventID=4956) or (EventID=5024)]]",
+                        "Security!*[System[(EventID=5033) or (EventID=8222)]]",
+                        "Microsoft-Windows-AppLocker/EXE and DLL!*[System[(EventID=8001) or (EventID=8002) or (EventID=8003) or (EventID=8004)]]",
+                        "Microsoft-Windows-AppLocker/MSI and Script!*[System[(EventID=8005) or (EventID=8006) or (EventID=8007)]]"
+                    ],
+                    "name": "eventLogsDataSource"
+                }
+            ]
+        },
+        "destinations": {
+            "logAnalytics": [
+                {
+                    "workspaceResourceId": "$workspaceResourceId",
+                    "workspaceId": "$workspaceId",
+                    "name": "DataCollectionEvent"
+                }
+            ]
+        },
+        "dataFlows": [
+            {
+                "streams": [
+                    "Microsoft-SecurityEvent"
+                ],
+                "destinations": [
+                    "DataCollectionEvent"
+                ]
+            }
+        ]
+    }
+}
+"@
+
+# Create the Data Collection Rule using the JSON string 
+New-AzDataCollectionRule -Name $dcrName -ResourceGroupName $resourceGroupName -JsonString $jsonContent
+
+# Add DCR association to VMs
+$vmNames = @("mserv", "win10")
+#$vmNames = @("fed01", "wsjoe")
+
+
+
+# Retrieve the ImmutableId for the DCR
+$dcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $dcrName
+if (!$dcr) {
+    Write-Output "DCR '$dcrName' not found in Resource Group '$resourceGroupName'." -ForegroundColor Red
+    exit
+}
+
+$dataCollectionRuleId = $dcr.Id
+
+
+$resourceGroupNameOps = "ITOperations"
+#$resourceGroupName = "IAAS"
+
+
+# Add DCR association to VMs
+$vmNames = @("mserv", "win10")
+foreach ($vmName in $vmNames) {
+    $vm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $vmName
+    if (!$vm) {
+        Write-Output "VM '$vmName' not found in Resource Group '$resourceGroupNameOps'." -ForegroundColor Red
+        continue
+    }
+
+    # Build the association
+    $targetResourceId = $vm.Id
+    $associationName = "$vmName-DCR-Association"
+
+    # Create DCR association
+    New-AzDataCollectionRuleAssociation -TargetResourceId $targetResourceId `
+        -DataCollectionRuleId $dataCollectionRuleId `
+        -AssociationName $associationName
+
+    Write-Output "DCR Association '$associationName' created for VM '$vmName' using Id." -ForegroundColor Green
+}
+
+
+# Deploy Azure Monitor Agent to the VMs
+foreach ($vmName in $vmNames) {
+    # Enable the Azure Monitor extension
+    $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
+        -VMName $vmName `
+        -Name "AzureMonitorWindowsAgent" `
+        -Publisher "Microsoft.Azure.Monitor" `
+        -ExtensionType "AzureMonitorWindowsAgent" `
+        -TypeHandlerVersion "1.0" `
+        -Location $location
+
+    Write-Output "Azure Monitor Agent deployed for VM '$vmName'." -ForegroundColor Green
+}
+
