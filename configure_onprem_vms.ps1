@@ -43,6 +43,7 @@ Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -C
 $resourceGroupName = "CyberSOC"
 $workspaceName = "CyberSOCWS"
 $dcrName = "Minimal-Servers"
+$linuxDcrName = "Minimal-Linux"
 
 # Get the resource group location
 $resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
@@ -116,14 +117,85 @@ $jsonContent = @"
 }
 "@
 
+$linuxJsonContent = @"
+{
+    "kind": "Linux",
+    "location": "$location",
+    "tags": {
+        "createdBy": "Sentinel"
+    },
+    "properties": {
+        "dataSources": {
+            "syslog": [
+                {
+                    "streams": [
+                        "Microsoft-CommonSecurityLog"
+                    ],
+                    "facilityNames": [
+                        "alert",
+                        "audit",
+                        "auth",
+                        "authpriv",
+                        "cron",
+                        "daemon",
+                        "local0",
+                        "local1",
+                        "local7"
+                    ],
+                    "logLevels": [
+                        "Info",
+                        "Notice",
+                        "Warning",
+                        "Error",
+                        "Critical",
+                        "Alert",
+                        "Emergency"
+                    ],
+                    "name": "sysLogsDataSource-1"
+                },
+                {
+                    "streams": [
+                        "Microsoft-CommonSecurityLog"
+                    ],
+                    "facilityNames": [
+                        "nopri"
+                    ],
+                    "logLevels": [
+                        "Emergency"
+                    ],
+                    "name": "sysLogsDataSource-2"
+                }
+            ]
+        },
+        "destinations": {
+            "logAnalytics": [
+                {
+                    "workspaceResourceId": "$workspaceResourceId",
+                    "workspaceId": "$workspaceId",
+                    "name": "DataCollectionEvent"
+                }
+            ]
+        },
+        "dataFlows": [
+            {
+                "streams": [
+                    "Microsoft-CommonSecurityLog"
+                ],
+                "destinations": [
+                    "DataCollectionEvent"
+                ]
+            }
+        ]
+    }
+}
+"@
+
 # Create the Data Collection Rule using the JSON string 
 New-AzDataCollectionRule -Name $dcrName -ResourceGroupName $resourceGroupName -JsonString $jsonContent
 
 # Add DCR association to VMs
 $vmNames = @("mserv", "win10")
 #$vmNames = @("fed01", "wsjoe")
-
-
 
 # Retrieve the ImmutableId for the DCR
 $dcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $dcrName
@@ -133,18 +205,14 @@ if (!$dcr) {
 }
 
 $dataCollectionRuleId = $dcr.Id
-
-
 $resourceGroupNameOps = "ITOperations"
-#$resourceGroupName = "IAAS"
-
 
 # Add DCR association to VMs
 $vmNames = @("mserv", "win10")
 foreach ($vmName in $vmNames) {
     $vm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $vmName
     if (!$vm) {
-        Write-Output "VM '$vmName' not found in Resource Group '$resourceGroupNameOps'." -ForegroundColor Red
+        Write-Output "VM '$vmName' not found in Resource Group '$resourceGroupNameOps'." 
         continue
     }
 
@@ -157,7 +225,7 @@ foreach ($vmName in $vmNames) {
         -DataCollectionRuleId $dataCollectionRuleId `
         -AssociationName $associationName
 
-    Write-Output "DCR Association '$associationName' created for VM '$vmName' using Id." -ForegroundColor Green
+    Write-Output "DCR Association '$associationName' created for VM '$vmName' using Id."
 }
 
 
@@ -172,8 +240,54 @@ foreach ($vmName in $vmNames) {
         -TypeHandlerVersion "1.0" `
         -Location $location
 
-    Write-Output "Azure Monitor Agent deployed for VM '$vmName'." -ForegroundColor Green
+    Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
 }
+
+
+#Linux DCR part
+New-AzDataCollectionRule -Name $linuxDcrName -ResourceGroupName $resourceGroupName -JsonString $linuxJsonContent
+
+# Add DCR association to VMs
+$linuxVmName = "linuxVM"
+
+
+# Retrieve the ImmutableId for the DCR
+$linuxDcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $linuxDcrName
+if (!$linuxDcr) {
+    Write-Output "DCR '$linuxDcrName' not found in Resource Group '$resourceGroupName'." 
+}
+
+$linuxDataCollectionRuleId = $linuxDcr.Id
+
+
+# Add DCR association to VMs
+$linuxVm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $linuxVmName
+if (!$linuxVm) {
+    Write-Output "VM '$linuxVmName' not found in Resource Group '$resourceGroupNameOps'." 
+}
+
+# Build the association
+$targetLinuxResourceId = $linuxVm.Id
+$LinuxassociationName = "linuxVM-DCR-Association"
+# Create DCR association
+New-AzDataCollectionRuleAssociation -TargetResourceId $targetLinuxResourceId `
+    -DataCollectionRuleId $linuxDataCollectionRuleId `
+    -AssociationName $LinuxassociationName
+
+    Write-Output "DCR Association '$LinuxassociationName' created for VM '$linuxVmName' using Id." 
+
+
+# Deploy Azure Monitor Agent to the Linux VM
+$extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
+    -VMName $linuxVmName `
+    -Name "AzureMonitorLinuxAgent" `
+    -Publisher "Microsoft.Azure.Monitor" `
+    -ExtensionType "AzureMonitorLinuxAgent" `
+    -TypeHandlerVersion "1.0" `
+    -Location $location
+
+Write-Output "Azure Monitor Agent deployed for VM '$linuxVmName'." 
+
 
 
 
@@ -267,7 +381,3 @@ Add-DnsServerForwarder -IPAddress "8.8.8.8"
 
 # Run the DNS forwarder configuration script on the DC VM
 Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $dnsForwarderScript
-
-
-
-
