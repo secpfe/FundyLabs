@@ -1,6 +1,6 @@
 #SETTINGS
-$ResourceGroup = "adxrg"
-$Workspace = "sectest"
+$ResourceGroup = "CyberSOC"
+$Workspace = "CyberSOCWS"
 
 $context = (Connect-AzAccount -Identity).context
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
