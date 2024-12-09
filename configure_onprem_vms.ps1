@@ -446,7 +446,7 @@ foreach (`$ou in `$OUs) {
 # Create service accounts with SPNs in ServiceAccounts OU
 foreach (`$account in `$ServiceAccounts) {
     New-ADUser -Name `$account -SamAccountName `$account `
-        -AccountPassword (ConvertTo-SecureString $adminPassword -AsPlainText -Force) -Enabled $true `
+        -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true `
         -Path "OU=ServiceAccounts,OU=Corp,`$domainDN" | Out-Null
     Write-Output "User `$account created in ServiceAccounts OU"
 
@@ -468,28 +468,28 @@ foreach (`$user in `$UserAccounts) {
     `$samAccountName = (`$firstName.Substring(0, 1) + `$lastName).ToLower()
     `$randomTitle = Get-Random -InputObject `$JobTitles
     New-ADUser -Name `$user -SamAccountName `$samAccountName -UserPrincipalName "`$samAccountName@`$domainDNS" `
-        -AccountPassword (ConvertTo-SecureString $adminPassword -AsPlainText -Force) -Enabled `$true -Title `$randomTitle `
+        -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true -Title `$randomTitle `
         -Path "OU=Users,OU=Corp,`$domainDN" | Out-Null
     Write-Output "User `$user created with job title `$randomTitle in Users OU"
 }
 
 # Create specific accounts in Admins OU
 New-ADUser -Name `$CandiceKevin.Name -SamAccountName `$CandiceKevin.SamAccountName -UserPrincipalName "`$(`$CandiceKevin.SamAccountName)@`$domainDNS" `
-    -AccountPassword (ConvertTo-SecureString $adminPassword -AsPlainText -Force) -Enabled `$true -Title `$CandiceKevin.Title `
-    -Path "OU=Admins,OU=Corp,`$domainDN" | Out-Null
+    -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true -Title `$CandiceKevin.Title `
+    -Path "OU=Users,OU=Corp,`$domainDN" | Out-Null
 Write-Output "User `$(`$CandiceKevin.Name) created in Admins OU"
 Add-ADGroupMember -Identity 'HR' -Members `$CandiceKevin.SamAccountName | Out-Null
 Write-Output "User `$(`$CandiceKevin.Name) added to group HR"
 
 New-ADUser -Name `$JonSmith.Name -SamAccountName `$JonSmith.SamAccountName -UserPrincipalName "`$(`$JonSmith.SamAccountName)@`$domainDNS" `
-    -AccountPassword (ConvertTo-SecureString $adminPassword -AsPlainText -Force) -Enabled `$true `
+    -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true `
     -Path "OU=Admins,OU=Corp,`$domainDN" | Out-Null
 Write-Output "User `$(`$JonSmith.Name) created in Admins OU"
 Add-ADGroupMember -Identity 'ITSupport' -Members `$JonSmith.SamAccountName | Out-Null
 Write-Output "User `$(`$JonSmith.Name) added to group ITSupport"
 
 New-ADUser -Name `$BatchAccount.Name -SamAccountName `$BatchAccount.SamAccountName -UserPrincipalName "`$(`$BatchAccount.SamAccountName)@`$domainDNS" `
-    -AccountPassword (ConvertTo-SecureString $adminPassword -AsPlainText -Force) -Enabled `$true `
+    -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true `
     -Path "OU=Admins,OU=Corp,`$domainDN" | Out-Null
 Write-Output "User `$(`$BatchAccount.Name) created in Admins OU"
 Add-ADGroupMember -Identity 'Domain Admins' -Members `$BatchAccount.SamAccountName | Out-Null
