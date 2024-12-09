@@ -44,6 +44,7 @@ $resourceGroupName = "CyberSOC"
 $workspaceName = "CyberSOCWS"
 $dcrName = "Minimal-Servers"
 $linuxDcrName = "Minimal-Linux"
+$DCDcrName = "Additional-DC"
 
 # Get the resource group location
 $resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
@@ -190,12 +191,58 @@ $linuxJsonContent = @"
 }
 "@
 
+
+$dcJsonContent= @"
+{
+    "kind": "Windows",
+    "location": "$location",
+    "tags": {
+        "createdBy": "Sentinel"
+    },
+    "properties": {
+        "dataSources": {
+            "windowsEventLogs": [
+                {
+                    "streams": [
+                        "Microsoft-SecurityEvent"
+                    ],
+                    "xPathQueries": [
+                        "Security!*[System[(EventID=4769 or EventID=4773)]]",
+                        "Directory Service!*[System[(EventID=2889 or EventID=2887)]]"
+                    ],
+                    "name": "eventLogsDataSource"
+                }
+            ]
+        },
+        "destinations": {
+            "logAnalytics": [
+                {
+                    "workspaceResourceId": "$workspaceResourceId",
+                    "workspaceId": "$workspaceId",
+                    "name": "DataCollectionEvent"
+                }
+            ]
+        },
+        "dataFlows": [
+            {
+                "streams": [
+                    "Microsoft-SecurityEvent"
+                ],
+                "destinations": [
+                    "DataCollectionEvent"
+                ]
+            }
+        ]
+    }
+}
+"@
+
+
 # Create the Data Collection Rule using the JSON string 
 New-AzDataCollectionRule -Name $dcrName -ResourceGroupName $resourceGroupName -JsonString $jsonContent
 
 # Add DCR association to VMs
-$vmNames = @("mserv", "win10")
-#$vmNames = @("fed01", "wsjoe")
+$vmNames = @("mserv", "win10", "dc")
 
 # Retrieve the ImmutableId for the DCR
 $dcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $dcrName
@@ -208,7 +255,6 @@ $dataCollectionRuleId = $dcr.Id
 $resourceGroupNameOps = "ITOperations"
 
 # Add DCR association to VMs
-$vmNames = @("mserv", "win10")
 foreach ($vmName in $vmNames) {
     $vm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $vmName
     if (!$vm) {
@@ -384,9 +430,17 @@ Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -C
 
 
 
+# Populate AD
+
 $ADOnjectsCreationScript = @"
+param (
+    [string]`$pwd
+)
+
 # Import the Active Directory module
 Import-Module ActiveDirectory
+
+New-Item -Path "C:\Temp" -ItemType Directory | out-null
 
 # Define global variables
 `$OUs = @(
@@ -437,7 +491,7 @@ foreach (`$ou in `$OUs) {
     if (-not `$existingOU) {
         # Construct the New-ADOrganizationalUnit path dynamically
         `$ouPath = if (`$parentOU -ne "") { "`$parentOU,`$domainDN" } else { `$domainDN }
-        New-ADOrganizationalUnit -Name `$currentOU -Path `$ouPath | Out-Null
+        New-ADOrganizationalUnit -Name `$currentOU -Path `$ouPath |  Out-File c:\temp\log.txt -Append
         Write-Host "OU `$ou created"
     }
 }
@@ -445,20 +499,18 @@ foreach (`$ou in `$OUs) {
 
 # Create service accounts with SPNs in ServiceAccounts OU
 foreach (`$account in `$ServiceAccounts) {
-    New-ADUser -Name `$account -SamAccountName `$account `
-        -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true `
-        -Path "OU=ServiceAccounts,OU=Corp,`$domainDN" | Out-Null
+    New-ADUser -Name `$account -SamAccountName `$account -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Path "OU=ServiceAccounts,OU=Corp,`$domainDN" 
     Write-Output "User `$account created in ServiceAccounts OU"
 
     `$serviceType = `$account -replace '^svc-', ''
     `$serverName = "`$serviceType-server01.`$domainDNS"
-    Set-ADUser -Identity `$account -ServicePrincipalNames @{Add="`$account/`$serverName"} | Out-Null
+    Set-ADUser -Identity `$account -ServicePrincipalNames @{Add="`$account/`$serverName"} 
     Write-Output "SPN `$account/`$serverName assigned"
 }
 
 # Create global security groups in Groups OU
 foreach (`$group in `$SecurityGroups + `$AdditionalGroups) {
-    New-ADGroup -Name `$group -GroupScope Global -Path "OU=Groups,OU=Corp,`$domainDN" | Out-Null
+    New-ADGroup -Name `$group -GroupScope Global -Path "OU=Groups,OU=Corp,`$domainDN" 
     Write-Output "Group `$group created in Groups OU"
 }
 
@@ -467,37 +519,29 @@ foreach (`$user in `$UserAccounts) {
     `$firstName, `$lastName = `$user -split ' '
     `$samAccountName = (`$firstName.Substring(0, 1) + `$lastName).ToLower()
     `$randomTitle = Get-Random -InputObject `$JobTitles
-    New-ADUser -Name `$user -SamAccountName `$samAccountName -UserPrincipalName "`$samAccountName@`$domainDNS" `
-        -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true -Title `$randomTitle `
-        -Path "OU=Users,OU=Corp,`$domainDN" | Out-Null
+    New-ADUser -Name `$user -SamAccountName `$samAccountName -UserPrincipalName "`$samAccountName@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Title `$randomTitle -Path "OU=Users,OU=Corp,`$domainDN" 
     Write-Output "User `$user created with job title `$randomTitle in Users OU"
 }
 
 # Create specific accounts in Admins OU
-New-ADUser -Name `$CandiceKevin.Name -SamAccountName `$CandiceKevin.SamAccountName -UserPrincipalName "`$(`$CandiceKevin.SamAccountName)@`$domainDNS" `
-    -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true -Title `$CandiceKevin.Title `
-    -Path "OU=Users,OU=Corp,`$domainDN" | Out-Null
+New-ADUser -Name `$CandiceKevin.Name -SamAccountName `$CandiceKevin.SamAccountName -UserPrincipalName "`$(`$CandiceKevin.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Title `$CandiceKevin.Title -Path "OU=Users,OU=Corp,`$domainDN" | Out-File "c:\temp\log.txt" -Append
 Write-Output "User `$(`$CandiceKevin.Name) created in Admins OU"
-Add-ADGroupMember -Identity 'HR' -Members `$CandiceKevin.SamAccountName | Out-Null
+Add-ADGroupMember -Identity 'HR' -Members `$CandiceKevin.SamAccountName 
 Write-Output "User `$(`$CandiceKevin.Name) added to group HR"
 
-New-ADUser -Name `$JonSmith.Name -SamAccountName `$JonSmith.SamAccountName -UserPrincipalName "`$(`$JonSmith.SamAccountName)@`$domainDNS" `
-    -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true `
-    -Path "OU=Admins,OU=Corp,`$domainDN" | Out-Null
+New-ADUser -Name `$JonSmith.Name -SamAccountName `$JonSmith.SamAccountName -UserPrincipalName "`$(`$JonSmith.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Path "OU=Admins,OU=Corp,`$domainDN" 
 Write-Output "User `$(`$JonSmith.Name) created in Admins OU"
-Add-ADGroupMember -Identity 'ITSupport' -Members `$JonSmith.SamAccountName | Out-Null
+Add-ADGroupMember -Identity 'ITSupport' -Members `$JonSmith.SamAccountName 
 Write-Output "User `$(`$JonSmith.Name) added to group ITSupport"
 
-New-ADUser -Name `$BatchAccount.Name -SamAccountName `$BatchAccount.SamAccountName -UserPrincipalName "`$(`$BatchAccount.SamAccountName)@`$domainDNS" `
-    -AccountPassword (ConvertTo-SecureString "$adminPassword" -AsPlainText -Force) -Enabled `$true `
-    -Path "OU=Admins,OU=Corp,`$domainDN" | Out-Null
+New-ADUser -Name `$BatchAccount.Name -SamAccountName `$BatchAccount.SamAccountName -UserPrincipalName "`$(`$BatchAccount.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Path "OU=Admins,OU=Corp,`$domainDN" 
 Write-Output "User `$(`$BatchAccount.Name) created in Admins OU"
-Add-ADGroupMember -Identity 'Domain Admins' -Members `$BatchAccount.SamAccountName | Out-Null
+Add-ADGroupMember -Identity 'Domain Admins' -Members `$BatchAccount.SamAccountName 
 Write-Output "User `$(`$BatchAccount.Name) added to group Domain Admins"
 
 # Create computer accounts in Servers OU
 foreach (`$computer in `$ComputerAccounts) {
-    New-ADComputer -Name `$computer -Path "OU=Servers,OU=Corp,`$domainDN" | Out-Null
+    New-ADComputer -Name `$computer -Path "OU=Servers,OU=Corp,`$domainDN" 
     Write-Output "Computer `$computer created in Servers OU"
 }
 
@@ -506,4 +550,48 @@ Write-Output "Active Directory environment setup with OU structure completed suc
 
 
 # Run object creation script on the DC VM
-Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $ADOnjectsCreationScript
+Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $ADOnjectsCreationScript -Parameter @{"pwd" = $adminPassword}
+
+
+#Add DCRs to DC
+
+# Create the Data Collection Rule using the JSON string 
+New-AzDataCollectionRule -Name $DCDcrName -ResourceGroupName $resourceGroupName -JsonString $dcJsonContent
+
+
+# Retrieve the ImmutableId for the DCR
+$DCdcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $DCDcrName
+if (!$DCdcr) {
+    Write-Output "DCR '$DCDcrName' not found in Resource Group '$resourceGroupName'." 
+    exit
+}
+
+$dataCollectionRuleId = $DCdcr.Id
+$resourceGroupNameOps = "ITOperations"
+
+# Add DCR association to VMs
+$DCvm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $DCvmName
+if (!$DCvm) {
+    Write-Output "VM '$DCvmName' not found in Resource Group '$resourceGroupNameOps'." 
+}
+
+# Build the association
+$targetResourceId = $DCvm.Id
+$associationName = "$DCvmName-DCR-Association"
+
+    # Create DCR association
+New-AzDataCollectionRuleAssociation -TargetResourceId $targetResourceId `
+    -DataCollectionRuleId $dataCollectionRuleId `
+    -AssociationName $associationName
+
+Write-Output "DCR Association '$associationName' created for VM '$DCvmName' using Id."
+
+$extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
+        -VMName $DCvmName `
+        -Name "AzureMonitorWindowsAgent" `
+        -Publisher "Microsoft.Azure.Monitor" `
+        -ExtensionType "AzureMonitorWindowsAgent" `
+        -TypeHandlerVersion "1.0" `
+        -Location $location
+
+Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
