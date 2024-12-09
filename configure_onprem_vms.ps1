@@ -420,28 +420,28 @@ Import-Module ActiveDirectory
 
 # Get the domain components dynamically
 `$domainDN = (Get-ADDomain).DistinguishedName
-`$domainDNS = ((Get-ADDomain).DNSRoot
+`$domainDNS = (Get-ADDomain).DNSRoot
 
 # Create OUs
 foreach (`$ou in `$OUs) {
     # Split the OU path to extract the current OU name and parent OU path
     `$parts = `$ou -split '/'
     `$currentOU = `$parts[-1]
-    `$parentOU = if (`$parts.Length -gt 1) `{ `"OU=`$(`$parts[-2])`" `} else `{ `"`" `} # Handle root-level OUs
-    
+    `$parentOU = if (`$parts.Length -gt 1) { "OU=`$(`$parts[-2])" } else { "" } # Handle root-level OUs
 
     # Construct the full SearchBase path dynamically
-    `$searchBase = if (`$parentOU -ne "") `{ `"`$parentOU,`$domainDN`" `} else `{ `$domainDN `}
+    `$searchBase = if (`$parentOU -ne "") { "`$parentOU,`$domainDN" } else { `$domainDN }
 
     # Check if the OU already exists
-    `$existingOU = Get-ADOrganizationalUnit -Filter `"Name -eq '`$currentOU'`" -SearchBase `$searchBase -ErrorAction SilentlyContinue
-    if (`-not `$existingOU) `{
+    `$existingOU = Get-ADOrganizationalUnit -Filter "Name -eq '`$currentOU'" -SearchBase `$searchBase -ErrorAction SilentlyContinue
+    if (-not `$existingOU) {
         # Construct the New-ADOrganizationalUnit path dynamically
         `$ouPath = if (`$parentOU -ne "") { "`$parentOU,`$domainDN" } else { `$domainDN }
         New-ADOrganizationalUnit -Name `$currentOU -Path `$ouPath | Out-Null
-        Write-Output "OU `$ou created"
-    `}
+        Write-Host "OU `$ou created"
+    }
 }
+
 
 # Create service accounts with SPNs in ServiceAccounts OU
 foreach (`$account in `$ServiceAccounts) {
