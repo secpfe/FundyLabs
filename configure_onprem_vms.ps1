@@ -451,7 +451,7 @@ foreach (`$account in `$ServiceAccounts) {
     Write-Output "User `$account created in ServiceAccounts OU"
 
     `$serviceType = `$account -replace '^svc-', ''
-    `$serverName = "`$serviceType-server01.corp.local"
+    `$serverName = "`$serviceType-server01.`$domainDNS"
     Set-ADUser -Identity `$account -ServicePrincipalNames @{Add="`$account/`$serverName"} | Out-Null
     Write-Output "SPN `$account/`$serverName assigned"
 }
