@@ -1,0 +1,113 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "accountName": {
+      "type": "string",
+      "defaultValue": "myOrchestratorAccount",
+      "metadata": {
+        "description": "Name of the Automation Account"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location of the Automation Account"
+      }
+    },
+    "samplePowerShellRunbookDescription": {
+      "type": "string",
+      "defaultValue": "Runbook using a managed identity to connect and execute a script",
+      "metadata": {
+        "description": "Description of the PowerShell runbook"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Automation/automationAccounts",
+      "apiVersion": "2021-06-22",
+      "name": "[parameters('accountName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "sku": {
+          "name": "Basic"
+        },
+        "publicNetworkAccess": true
+      },
+      "resources": [
+        {
+          "type": "runbooks",
+          "apiVersion": "2019-06-01",
+          "name": "ConfigureVMs",
+          "location": "[parameters('location')]",
+          "dependsOn": [
+            "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
+          ],
+          "properties": {
+            "runbookType": "PowerShell72",
+            "logProgress": true,
+            "logVerbose": true,
+            "description": "[parameters('samplePowerShellRunbookDescription')]",
+            "runSettings": {
+              "runtimeVersion": "7.2"
+            },
+            "publishContentLink": {
+              "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/configure_onprem_vms.ps1",
+              "version": "1.0.0.0"
+            }
+          }
+        },
+        {
+          "type": "runbooks",
+          "apiVersion": "2019-06-01",
+          "name": "ConfigureWorkbooks",
+          "location": "[parameters('location')]",
+          "dependsOn": [
+            "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
+          ],
+          "properties": {
+            "runbookType": "PowerShell72",
+            "logProgress": true,
+            "logVerbose": true,
+            "description": "[parameters('samplePowerShellRunbookDescription')]",
+            "runSettings": {
+              "runtimeVersion": "7.2"
+            },
+            "publishContentLink": {
+              "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/deployworkbooks.ps1",
+              "version": "1.0.0.0"
+            }
+          }
+        },
+        {
+          "type": "runbooks",
+          "apiVersion": "2019-06-01",
+          "name": "ConfigureTableRetention",
+          "location": "[parameters('location')]",
+          "dependsOn": [
+            "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
+          ],
+          "properties": {
+            "runbookType": "PowerShell72",
+            "logProgress": true,
+            "logVerbose": true,
+            "description": "[parameters('samplePowerShellRunbookDescription')]",
+            "runSettings": {
+              "runtimeVersion": "7.2"
+            },
+            "publishContentLink": {
+              "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/Set-MsSentintelTableRetention-Runbook.ps1",
+              "version": "1.0.0.0"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": {}
+}
