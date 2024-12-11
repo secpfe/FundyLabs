@@ -549,7 +549,10 @@ Write-Output "Active Directory environment setup with OU structure completed suc
 
 
 # Run object creation script on the DC VM
-Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $ADOnjectsCreationScript -Parameter @{"pwd" = $adminPassword}
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $ADOnjectsCreationScript -Parameter @{"pwd" = $adminPassword}
+
+# View the full output of provisioning
+$output.Value | ForEach-Object { $_.Message }
 
 
 #Add DCRs to DC
