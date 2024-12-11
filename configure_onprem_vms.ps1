@@ -490,10 +490,11 @@ foreach (`$ou in `$OUs) {
     if (-not `$existingOU) {
         # Construct the New-ADOrganizationalUnit path dynamically
         `$ouPath = if (`$parentOU -ne "") { "`$parentOU,`$domainDN" } else { `$domainDN }
-        New-ADOrganizationalUnit -Name `$currentOU -Path `$ouPath |  Out-File c:\temp\log.txt -Append
+        New-ADOrganizationalUnit -Name `$currentOU -Path `$ouPath 
         Write-Host "OU `$ou created"
     }
 }
+
 
 
 # Create service accounts with SPNs in ServiceAccounts OU
@@ -523,7 +524,7 @@ foreach (`$user in `$UserAccounts) {
 }
 
 # Create specific accounts in Admins OU
-New-ADUser -Name `$CandiceKevin.Name -SamAccountName `$CandiceKevin.SamAccountName -UserPrincipalName "`$(`$CandiceKevin.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Title `$CandiceKevin.Title -Path "OU=Users,OU=Corp,`$domainDN" | Out-File "c:\temp\log.txt" -Append
+New-ADUser -Name `$CandiceKevin.Name -SamAccountName `$CandiceKevin.SamAccountName -UserPrincipalName "`$(`$CandiceKevin.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Title `$CandiceKevin.Title -Path "OU=Users,OU=Corp,`$domainDN"
 Write-Output "User `$(`$CandiceKevin.Name) created in Admins OU"
 Add-ADGroupMember -Identity 'HR' -Members `$CandiceKevin.SamAccountName 
 Write-Output "User `$(`$CandiceKevin.Name) added to group HR"
