@@ -294,7 +294,7 @@ foreach ($vmName in $vmNames) {
 New-AzDataCollectionRule -Name $linuxDcrName -ResourceGroupName $resourceGroupName -JsonString $linuxJsonContent
 
 # Add DCR association to VMs
-$linuxVmName = "linuxVM"
+$web01Name = "web01"
 
 
 # Retrieve the ImmutableId for the DCR
@@ -307,32 +307,32 @@ $linuxDataCollectionRuleId = $linuxDcr.Id
 
 
 # Add DCR association to VMs
-$linuxVm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $linuxVmName
-if (!$linuxVm) {
-    Write-Output "VM '$linuxVmName' not found in Resource Group '$resourceGroupNameOps'." 
+$web01 = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $web01Name
+if (!$web01) {
+    Write-Output "VM '$web01Name' not found in Resource Group '$resourceGroupNameOps'." 
 }
 
 # Build the association
-$targetLinuxResourceId = $linuxVm.Id
-$LinuxassociationName = "linuxVM-DCR-Association"
+$targetLinuxResourceId = $web01.Id
+$LinuxassociationName = "web01-DCR-Association"
 # Create DCR association
 New-AzDataCollectionRuleAssociation -TargetResourceId $targetLinuxResourceId `
     -DataCollectionRuleId $linuxDataCollectionRuleId `
     -AssociationName $LinuxassociationName
 
-    Write-Output "DCR Association '$LinuxassociationName' created for VM '$linuxVmName' using Id." 
+    Write-Output "DCR Association '$LinuxassociationName' created for VM '$web01Name' using Id." 
 
 
 # Deploy Azure Monitor Agent to the Linux VM
 $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
-    -VMName $linuxVmName `
+    -VMName $web01Name `
     -Name "AzureMonitorLinuxAgent" `
     -Publisher "Microsoft.Azure.Monitor" `
     -ExtensionType "AzureMonitorLinuxAgent" `
     -TypeHandlerVersion "1.0" `
     -Location $location
 
-Write-Output "Azure Monitor Agent deployed for VM '$linuxVmName'." 
+Write-Output "Azure Monitor Agent deployed for VM '$web01Name'." 
 
 
 
@@ -440,7 +440,6 @@ param (
 # Import the Active Directory module
 Import-Module ActiveDirectory
 
-New-Item -Path "C:\Temp" -ItemType Directory | out-null
 
 # Define global variables
 `$OUs = @(
@@ -594,4 +593,4 @@ $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
         -TypeHandlerVersion "1.0" `
         -Location $location
 
-Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
+Write-Output "Azure Monitor Agent deployed for VM '$DCvmName'." 
