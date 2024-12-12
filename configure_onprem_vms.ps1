@@ -604,6 +604,16 @@ Write-Output "Azure Monitor Agent deployed for VM '$DCvmName'."
 # replace with additional actions 
 Start-Sleep 30
 
+$EnableLDAPAuditScriptString = @"
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Diagnostics" -Name "16 LDAP Interface Events" -Value 2 -Type DWord
+"@
+# Enable LDAP Audit on DC VM
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $EnableLDAPAuditScriptString 
+
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
+
+
 # LDAP Simple Bind 
 # Python script to execute on the Linux VM 
 $PythonScript = @"
