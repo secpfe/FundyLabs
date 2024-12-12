@@ -643,11 +643,13 @@ connect_to_ad(AD_SERVER, AD_USER2, AD_PASSWORD)
 # Bash command to create and run the Python script
 $Command = @"
 #!/bin/bash
-sudo apt-get update
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get update -y
 sudo apt-get install -y python3-pip
 pip3 install ldap3
 echo "$PythonScript" > /tmp/temp_script.py
 python3 /tmp/temp_script.py
+unset DEBIAN_FRONTEND 
 "@
 
 
