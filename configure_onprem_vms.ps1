@@ -604,11 +604,38 @@ Write-Output "Azure Monitor Agent deployed for VM '$DCvmName'."
 # replace with additional actions 
 Start-Sleep 30
 
-$EnableLDAPAuditScriptString = @"
+$EnableAuditScriptString = @"
+Write-Output "Enabling LDAP Diagnostics Settings..."
 Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Diagnostics" -Name "16 LDAP Interface Events" -Value 2 -Type DWord
+
+Write-Output "LDAP Diagnostics successfully configured."
+
+# Configure Advanced Audit Policies for specific subcategories
+
+Write-Output "Setting Advanced Audit Policies..."
+
+# Logon/Logoff
+& auditpol.exe /set /subcategory:"Logon" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Logoff" /success:disable
+& auditpol.exe /set /subcategory:"Special Logon" /success:enable /failure:enable
+
+# Account Logon
+& auditpol.exe /set /subcategory:"Kerberos Service Ticket Operations" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Kerberos Authentication Service" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Credential Validation" /success:enable
+
+# Account Management
+& auditpol.exe /set /subcategory:"Computer Account Management" /success:enable
+& auditpol.exe /set /subcategory:"Security Group Management" /success:enable
+& auditpol.exe /set /subcategory:"User Account Management" /success:enable
+
+# DS Access
+& auditpol.exe /set /subcategory:"Directory Service Access" /success:enable /failure:enable
+
+Write-Output "Advanced Audit Policies successfully configured."
 "@
 # Enable LDAP Audit on DC VM
-$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $EnableLDAPAuditScriptString 
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $EnableAuditScriptString 
 
 # View the full output
 $output.Value | ForEach-Object { $_.Message }
