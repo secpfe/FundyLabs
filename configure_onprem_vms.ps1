@@ -1,6 +1,8 @@
 param (
     [string]$adminAccount,
-    [string]$adminPassword
+    [string]$adminPassword,
+    [string]$LDAPUserAccount1,
+    [string]$LDAPUserAccount2
 )
 
 Import-Module Az.Compute
@@ -598,3 +600,72 @@ $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
         -Location $location
 
 Write-Output "Azure Monitor Agent deployed for VM '$DCvmName'." 
+
+# replace with additional actions 
+Start-Sleep 30
+
+# LDAP Simple Bind 
+# Python script to execute on the Linux VM 
+$PythonScript = @"
+from ldap3 import Server, Connection, ALL, SIMPLE
+
+def connect_to_ad(server_address, user, password):
+    server = Server(server_address, get_info=ALL)
+    try:
+        conn = Connection(
+            server,
+            user=user,
+            password=password,
+            authentication=SIMPLE,
+            auto_bind=True
+        )
+        if conn.bind():
+            print(f\"Successfully connected as {user}\")
+        else:
+            print(f\"Failed to bind: {conn.result}\")
+    except Exception as e:
+        print(f\"An error occurred: {e}\")
+    finally:
+        if conn:
+            conn.unbind()
+
+AD_SERVER = 'ldap://10.0.0.4'
+AD_USER1 = 'ODOMAIN\\\\$LDAPUserAccount1'
+AD_USER2 = 'ODOMAIN\\\\$LDAPUserAccount2'
+AD_PASSWORD = '$adminPassword'
+
+connect_to_ad(AD_SERVER, AD_USER1, AD_PASSWORD)
+connect_to_ad(AD_SERVER, AD_USER2, AD_PASSWORD)
+"@
+
+#Write-Output $PythonScript
+
+# Bash command to create and run the Python script
+$Command = @"
+#!/bin/bash
+sudo apt-get update
+sudo apt-get install -y python3-pip
+pip3 install ldap3
+echo "$PythonScript" > /tmp/temp_script.py
+python3 /tmp/temp_script.py
+"@
+
+
+Connect-AzAccount -Identity
+# Execute the command on the Linux VM
+Write-Output "Executing script on the Linux VM..."
+try {
+    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
+                                    -VMName $web01Name `
+                                    -CommandId "RunShellScript" `
+                                    -ScriptString $Command
+
+    if ($result) {
+        Write-Output "Command executed successfully. Output:"
+        $result.Value[0].Message | Write-Output
+    } else {
+        Write-Output "Command execution failed or returned no output."
+    }
+} catch {
+    Write-Error "Failed to execute command: $_"
+}
