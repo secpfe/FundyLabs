@@ -650,7 +650,9 @@ Set-ItemProperty -Path `$regPath -Name `$regValue -Value 1
 Write-Output "LAN Manager Authentication Level downgraded to NTLMv1 successfully."
 
 `$FileSharePath = "\\10.0.0.4\Sysvol"
-`$Credential = New-Object System.Management.Automation.PSCredential ("da-batch", "$adminPassword")
+`$securePassword = ConvertTo-SecureString '$adminPassword' -AsPlainText -Force
+`$Credential = New-Object System.Management.Automation.PSCredential ("da-batch", `$securePassword)
+
 Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
 Write-Output "Accessed SYSVOL under da-batch account, with downgraded NTLM."
 "@
