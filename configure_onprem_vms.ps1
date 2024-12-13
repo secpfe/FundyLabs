@@ -601,9 +601,6 @@ $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
 
 Write-Output "Azure Monitor Agent deployed for VM '$DCvmName'." 
 
-# replace with additional actions 
-Start-Sleep 30
-
 $EnableAuditScriptString = @"
 Write-Output "Enabling LDAP Diagnostics Settings..."
 Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Diagnostics" -Name "16 LDAP Interface Events" -Value 2 -Type DWord
@@ -611,6 +608,7 @@ Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Diagnostics
 Write-Output "LDAP Diagnostics successfully configured."
 
 # Configure Advanced Audit Policies for specific subcategories
+# auditpol /get /category:*
 
 Write-Output "Setting Advanced Audit Policies..."
 
@@ -640,6 +638,27 @@ $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $D
 # View the full output
 $output.Value | ForEach-Object { $_.Message }
 
+
+
+#Downgrade to NTLM and access DC file share under an account with NTLM
+$mservscript = @"
+`$regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
+`$regValue = "LmCompatibilityLevel"
+
+# Set the desired level
+Set-ItemProperty -Path `$regPath -Name `$regValue -Value 1
+Write-Output "LAN Manager Authentication Level downgraded to NTLMv1 successfully."
+
+$FileSharePath = "\\10.0.0.4\Sysvol"
+$Credential = New-Object System.Management.Automation.PSCredential ("da-batch", $adminPassword)
+Start-Process powershell.exe -Credential $Credential -ArgumentList "-Command Get-ChildItem -Path $FileSharePath; Start-Sleep -Seconds 1;Exit"
+Write-Output "Accessed SYSVOL under da-batch account, with downgraded NTLM."
+"@
+# Enable LDAP Audit on DC VM
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
+
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
 
 # LDAP Simple Bind 
 # Python script to execute on the Linux VM 
