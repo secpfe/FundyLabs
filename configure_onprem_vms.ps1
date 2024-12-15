@@ -631,6 +631,37 @@ Write-Output "Setting Advanced Audit Policies..."
 & auditpol.exe /set /subcategory:"Directory Service Access" /success:enable /failure:enable
 
 Write-Output "Advanced Audit Policies successfully configured."
+
+
+# Define the folder path and share name
+`$FolderPath = "C:\HealthReports"
+`$ShareName = "HealthReports"
+`$Description = "Shared folder for health reports"
+
+# Create the folder if it doesn't exist
+if (-Not (Test-Path `$FolderPath)) {
+    New-Item -ItemType Directory -Path `$FolderPath
+    Write-Output "Folder '`$FolderPath' created."
+} else {
+    Write-Output "Folder '`$FolderPath' already exists."
+}
+
+# Set NTFS permissions: Add "Everyone" with read access
+`$Acl = Get-Acl `$FolderPath
+`$AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("Everyone", "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")
+`$Acl.SetAccessRule(`$AccessRule)
+Set-Acl -Path `$FolderPath -AclObject `$Acl
+Write-Output "NTFS permissions for 'Everyone' set to 'Read'."
+
+# Create the network share
+`$ShareParams = @{
+    Name        = `$ShareName
+    Path        = `$FolderPath
+    Description = `$Description
+}
+New-SmbShare @ShareParams -FullAccess "Administrator" -ReadAccess "Everyone"
+Write-Output "Share '`$ShareName' created and shared with 'Everyone' for read access."
+
 "@
 # Enable LDAP Audit on DC VM
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $EnableAuditScriptString 
@@ -649,12 +680,20 @@ $mservscript = @"
 Set-ItemProperty -Path `$regPath -Name `$regValue -Value 1
 Write-Output "LAN Manager Authentication Level downgraded to NTLMv1 successfully."
 
-`$FileSharePath = "\\10.0.0.4\Sysvol"
-`$securePassword = ConvertTo-SecureString '$adminPassword' -AsPlainText -Force
-`$Credential = New-Object System.Management.Automation.PSCredential ("da-batch", `$securePassword)
+`$FileSharePath = "\\10.0.0.4\HealthReports"
+`$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
+`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\da-batch", `$securePassword)
 
-Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
-Write-Output "Accessed SYSVOL under da-batch account, with downgraded NTLM."
+# Directly access the file share with the specified credentials
+`$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
+try {
+    Get-ChildItem -Path "TempShare:\"
+} finally {
+    Remove-PSDrive -Name TempShare
+}
+
+#Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
+Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
 "@
 # Enable LDAP Audit on DC VM
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
