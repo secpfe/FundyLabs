@@ -750,7 +750,7 @@ python3 -m pipx install impacket
 pip3 install ldap3
 echo "$PythonScript" > /tmp/temp_script.py
 python3 /tmp/temp_script.py
-GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
+sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
 unset DEBIAN_FRONTEND 
 "@
 
