@@ -1,5 +1,5 @@
 #SETTINGS
-$WorkspaceName = "log-sentinel-001"
+$WorkspaceName = "CyberSOCWS"
 $TableNames = @("AzureActivity","SecurityEvent")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
