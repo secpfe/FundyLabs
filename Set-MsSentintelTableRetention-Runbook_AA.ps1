@@ -1,12 +1,11 @@
 #SETTINGS
-$Subscription = "Visual Studio Enterprise Subscription"
-$WorkspaceName = "log-sentinel-001"
+$WorkspaceName = "CyberSOCWS"
 $TableNames = @("AzureActivity")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
 
 try {
-    Connect-AzAccount -Identity -Subscription $Subscription
+    Connect-AzAccount -Identity
 }
 catch {
     Write-Error "Failed to get or connect to Azure context: $_" -ErrorAction Stop
@@ -43,7 +42,7 @@ foreach ($TableName in $TableNames) {
     }
 
     try {
-        $webData = Invoke-AzRestMethod -Path $tablelistpath -Method GET
+        $webData = Invoke-AzRestMethod -Path $tablelistpath -Method GET 
         if ($webData.StatusCode -eq 200) {
             $webData = ($webData.Content | ConvertFrom-Json)
                 $table = [PSCustomObject]@{
