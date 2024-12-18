@@ -3,7 +3,6 @@ $ResourceGroup = "CyberSOC"
 $Workspace = "CyberSOCWS"
 $RetentionInDays = 60
 
-# $context = (Connect-AzAccount).context
 $context = (Connect-AzAccount -Identity).context
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
