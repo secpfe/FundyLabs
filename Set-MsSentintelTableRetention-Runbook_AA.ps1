@@ -1,6 +1,6 @@
 #SETTINGS
 $WorkspaceName = "CyberSOCWS"
-$TableNames = @("AzureActivity","SecurityEvent")
+$TableNames = @("AzureActivity")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
 

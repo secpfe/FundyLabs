@@ -1,8 +1,8 @@
 #SETTINGS
 $WorkspaceName = "CyberSOCWS"
-$TableNames = @("AzureActivity","SecurityEvent")
+$TableNames = @("SecurityEvent")
 $RetentionInDays = 90
-$TotalRetentionInDays = 120
+$TotalRetentionInDays = 180
 
 try {
     Connect-AzAccount -Identity
