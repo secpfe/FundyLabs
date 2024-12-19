@@ -3,8 +3,7 @@ $ResourceGroup = "ITOperations"
 $WebAppName = "myVulWebApp"
 $Command = "mv /home/site/wwwroot/config.ini /home/site/"
 
-$context = (Connect-AzAccount).context
-# $context = (Connect-AzAccount -Identity).context
+$context = (Connect-AzAccount -Identity).context
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
     'Content-Type'  = 'application/json'
