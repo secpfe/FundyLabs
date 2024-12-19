@@ -1,19 +1,18 @@
 #SETTINGS
 $ResourceGroup = "ITOperations"
-$WebAppName = "myVulWebApp"
 $Command = "mv /home/site/wwwroot/config.ini /home/site/"
 
-$context = (Connect-AzAccount -Identity).context
+$context = (Connect-AzAccount).context
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
     'Content-Type'  = 'application/json'
     'Authorization' = 'Bearer ' + $token.Token
 }
 $SubscriptionId = $context.Subscription.Id
+$WebAppName = (Get-AzWebApp -ResourceGroupName $ResourceGroup).Name
+
 $serverUrl = "https://management.azure.com"
 $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.Web/sites/${WebAppName}/config/web?api-version=2024-04-01"
-
-#Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
 
 $appsetting = @{
     properties = @{
