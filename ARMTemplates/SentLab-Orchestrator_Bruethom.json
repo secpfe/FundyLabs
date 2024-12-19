@@ -43,7 +43,7 @@
         {
           "type": "runbooks",
           "apiVersion": "2019-06-01",
-          "name": "ConfigureVMs",
+          "name": "ConfigureWorkspaceTableRetention",
           "location": "[parameters('location')]",
           "dependsOn": [
             "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
@@ -57,29 +57,7 @@
               "runtimeVersion": "7.2"
             },
             "publishContentLink": {
-              "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/configure_onprem_vms.ps1",
-              "version": "1.0.0.0"
-            }
-          }
-        },
-        {
-          "type": "runbooks",
-          "apiVersion": "2019-06-01",
-          "name": "ConfigureWorkbooks",
-          "location": "[parameters('location')]",
-          "dependsOn": [
-            "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
-          ],
-          "properties": {
-            "runbookType": "PowerShell72",
-            "logProgress": true,
-            "logVerbose": true,
-            "description": "[parameters('samplePowerShellRunbookDescription')]",
-            "runSettings": {
-              "runtimeVersion": "7.2"
-            },
-            "publishContentLink": {
-              "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/deployworkbooks.ps1",
+              "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/Set-MsSentintelTableRetentionWorkspace-Runbook.ps1",
               "version": "1.0.0.0"
             }
           }
@@ -102,6 +80,28 @@
             },
             "publishContentLink": {
               "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/Set-MsSentintelTableRetention-Runbook.ps1",
+              "version": "1.0.0.0"
+            }
+          }
+        },
+        {
+          "type": "runbooks",
+          "apiVersion": "2019-06-01",
+          "name": "UpdateVulWebApp",
+          "location": "[parameters('location')]",
+          "dependsOn": [
+            "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
+          ],
+          "properties": {
+            "runbookType": "PowerShell72",
+            "logProgress": true,
+            "logVerbose": true,
+            "description": "[parameters('samplePowerShellRunbookDescription')]",
+            "runSettings": {
+              "runtimeVersion": "7.2"
+            },
+            "publishContentLink": {
+              "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/Update-VulWebApp-Runbook.ps1",
               "version": "1.0.0.0"
             }
           }
