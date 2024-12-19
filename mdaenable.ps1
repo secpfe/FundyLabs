@@ -5,7 +5,7 @@ $Region = "westeurope"
 
 
 $context = (Connect-AzAccount -Identity).context
-$token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
+$token = (Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id).Token
 $authHeader = @{
     'Content-Type'  = 'application/json'
     'Authorization' = 'Bearer ' + $token.Token
