@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
       "namePrefix": {
-        "defaultValue": "myVulWebApp",
+        "defaultValue": "[concat('myVulWebApp-',uniqueString(resourceGroup().id))]",
         "type": "String"
       },
       "location": {
