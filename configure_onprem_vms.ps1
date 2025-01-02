@@ -582,7 +582,7 @@ if (!$DCvm) {
 
 # Build the association
 $targetResourceId = $DCvm.Id
-$associationName = "$DCvmName-DCR-Association"
+$associationName = "$DCvmName-DCR-Association-addt"
 
     # Create DCR association
 New-AzDataCollectionRuleAssociation -TargetResourceId $targetResourceId `
@@ -797,8 +797,8 @@ Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
 `$binaryPath = "C:\Path\MyService.exe"
 `$startType = "Automatic"
 
-# Create the service using sc.exe 
-`$command = "sc.exe create `$serviceName binPath= "`$binaryPath" obj= odomain\da-batch password= `$adminPassword start= auto"
+# Create the service using sc.exe
+`$command = "sc.exe create `$serviceName binPath= "`$binaryPath" obj= odomain\da-batch password= $adminPassword start= auto"
 Invoke-Expression `$command
 
 
