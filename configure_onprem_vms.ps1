@@ -695,7 +695,7 @@ try {
 #Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
 Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
 "@
-# Enable LDAP Audit on DC VM
+# Connect with NTLMv1
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
 
 # View the full output
@@ -755,7 +755,6 @@ unset DEBIAN_FRONTEND
 "@
 
 
-Connect-AzAccount -Identity
 # Execute the command on the Linux VM
 Write-Output "Executing script on the Linux VM..."
 try {
@@ -773,3 +772,39 @@ try {
 } catch {
     Write-Error "Failed to execute command: $_"
 }
+
+
+#Acess DC file share under an account with NTLMv1
+$mservscript = @"
+`$FileSharePath = "\\10.0.0.4\HealthReports"
+`$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
+`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\da-batch", `$securePassword)
+
+# Directly access the file share with the specified credentials
+`$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
+try {
+    Get-ChildItem -Path "TempShare:\"
+} finally {
+    Remove-PSDrive -Name TempShare
+}
+
+#Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
+Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
+
+
+# Define the service details
+`$serviceName = "MyService"
+`$binaryPath = "C:\Path\MyService.exe"
+`$startType = "Automatic"
+
+# Create the service using sc.exe 
+`$command = "sc.exe create `$serviceName binPath= "`$binaryPath" obj= odomain\da-batch password= `$adminPassword start= auto"
+Invoke-Expression `$command
+
+
+"@
+# Connect with NTLMv1
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
+
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
