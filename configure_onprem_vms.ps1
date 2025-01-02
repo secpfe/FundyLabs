@@ -792,13 +792,9 @@ try {
 Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
 
 
-# Define the service details
-`$serviceName = "MyService"
-`$binaryPath = "C:\Path\MyService.exe"
-`$startType = "Automatic"
 
 # Create the service using sc.exe
-`$command = "sc.exe create `$serviceName binPath= "`$binaryPath" obj= odomain\da-batch password= $adminPassword start= auto"
+`$command = "sc.exe create BackupSVC binPath= c:\backup\backup.exe obj= odomain\da-batch password= $adminPassword start= auto"
 Invoke-Expression `$command
 
 
