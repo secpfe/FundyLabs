@@ -798,6 +798,39 @@ Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
 Invoke-Expression `$command
 
 
+# Define the service account
+`$AccountName = "odomain\da-batch"  
+
+# Get the SID of the account
+`$accountSID = (New-Object System.Security.Principal.NTAccount(`$AccountName)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+
+# Export the current security policy
+`$SecEditFile = "`$env:temp\secpol.cfg"
+secedit /export /cfg `$SecEditFile | Out-Null
+
+# Read the exported security policy
+`$config = Get-Content `$SecEditFile
+
+# Check if the SID is already listed
+if (`$config -match "SeServiceLogonRight\s*=\s*(.*`$accountSID.*)") {
+    Write-Host "`$AccountName already has 'Log on as a service' rights."
+    sc start BackupSVC
+} else {
+    # Append the SID to the existing list
+    `$updatedConfig = `$config -replace "(SeServiceLogonRight\s*=\s*)(.*)", "```$1```$2,*`$accountSID"
+    Set-Content `$SecEditFile `$updatedConfig
+
+    # Apply the updated police
+    secedit /configure /db secedit.sdb /cfg `$SecEditFile /areas USER_RIGHTS
+
+    Write-Host "Granted 'Log on as a service' rights to `$AccountName."
+    gpupdate /force
+    sc.exe start backupsvc
+}
+
+# Clean up temporary files
+Remove-Item `$SecEditFile -Force
+
 "@
 # Connect with NTLMv1
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
