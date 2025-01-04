@@ -209,7 +209,7 @@ $dcJsonContent= @"
                         "Microsoft-SecurityEvent"
                     ],
                     "xPathQueries": [
-                        "Security!*[System[(EventID=4769 or EventID=4773)]]",
+                        "Security!*[System[(EventID=4769 or EventID=4773 or EventID=4627)]]",
                         "Directory Service!*[System[(EventID=2889 or EventID=2887)]]"
                     ],
                     "name": "eventLogsDataSource"
