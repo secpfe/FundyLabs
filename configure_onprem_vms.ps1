@@ -621,6 +621,7 @@ Write-Output "Setting Advanced Audit Policies..."
 & auditpol.exe /set /subcategory:"Kerberos Service Ticket Operations" /success:enable /failure:enable
 & auditpol.exe /set /subcategory:"Kerberos Authentication Service" /success:enable /failure:enable
 & auditpol.exe /set /subcategory:"Credential Validation" /success:enable
+& auditpol.exe /set /subcategory:"Group Membership" /success:enable /failure:enable
 
 # Account Management
 & auditpol.exe /set /subcategory:"Computer Account Management" /success:enable
