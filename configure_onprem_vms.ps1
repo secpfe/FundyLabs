@@ -757,7 +757,7 @@ unset DEBIAN_FRONTEND
 
 
 # Execute the command on the Linux VM
-Write-Output "Executing script on the Linux VM..."
+Write-Output "Executing script on the Linux VM web01..."
 try {
     $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
                                     -VMName $web01Name `
@@ -773,6 +773,136 @@ try {
 } catch {
     Write-Error "Failed to execute command: $_"
 }
+
+
+#Scheduling autolog generator on bastion-gw01
+$bastionName = "bastion-gw01"
+
+$BastionSimScript = @"
+import os
+import time
+from random import choice, randint
+
+def log_cef_message(severity, signature_id, name, extensions):
+    """Helper function to log CEF-compliant messages using `logger`."""
+    base_cef = f"CEF:0|Linux|SecurityMonitoring|1.0|{signature_id}|{name}|{severity}|"
+    extension_str = " ".join([f"{key}={value}" for key, value in extensions.items()])
+    cef_message = f"{base_cef}{extension_str}"
+    os.system(f"logger -p auth.{severity} '{cef_message}'")
+    print(cef_message)
+
+def generate_failed_ssh_logins():
+    # General failed logins for valid and random accounts
+    users = ["root", "admin", "user1", "contractor"]
+    ip_addresses = ["192.168.1.10", "203.0.113.5", "10.0.0.25"]
+    for _ in range(5):
+        user = choice(users)
+        ip = choice(ip_addresses)
+        extensions = {
+            "duser": user,
+            "src": ip,
+            "dst": "10.0.0.11",
+            "spt": 22,
+            "msg": f"Failed password for {user}"
+        }
+        log_cef_message(5, "1001", "Failed SSH login", extensions)
+        time.sleep(randint(1, 10))  # Random interval
+
+def generate_specific_failed_logons():
+    # Specific failed logins for non-existent accounts
+    accounts = ["candice.kevin", "da-batch"]
+    source_ip = "10.0.0.10"
+    for _ in range(3):
+        user = choice(accounts)
+        extensions = {
+            "duser": user,
+            "src": source_ip,
+            "dst": "10.0.0.1",
+            "spt": 22,
+            "msg": f"Failed password for {user}"
+        }
+        log_cef_message(5, "1002", "Failed SSH login (non-existent user)", extensions)
+        time.sleep(randint(1, 10))  # Random interval
+
+def generate_successful_logins():
+    # Successful logins for existing users
+    users = ["root", "admin", "user1"]
+    ip_addresses = ["192.168.1.10", "203.0.113.5", "10.0.0.25"]
+    for _ in range(4):
+        user = choice(users)
+        ip = choice(ip_addresses)
+        extensions = {
+            "duser": user,
+            "src": ip,
+            "dst": "10.0.0.11",
+            "spt": 22,
+            "msg": f"Accepted password for {user}"
+        }
+        log_cef_message(1, "1003", "Successful SSH login", extensions)
+        time.sleep(randint(1, 10))  # Random interval
+
+def generate_privilege_escalation_logs():
+    # Privilege escalation attempts
+    users = ["admin", "devops", "security_user"]
+    for _ in range(3):
+        user = choice(users)
+        extensions = {
+            "duser": user,
+            "msg": f"User {user} attempted to execute 'sudo su' command"
+        }
+        log_cef_message(8, "1004", "Privilege escalation attempt", extensions)
+        time.sleep(randint(1, 10))  # Random interval
+
+def generate_system_alerts():
+    # System-critical alerts
+    extensions = {
+        "msg": "Disk space usage exceeded threshold: /dev/sda1 at 95%",
+        "disk": "/dev/sda1",
+        "usage": "95%"
+    }
+    log_cef_message(10, "1005", "Critical system alert", extensions)
+    time.sleep(randint(1, 10))  # Random interval
+
+# Main loop to generate logs
+if __name__ == "__main__":
+    print("Generating CEF-compliant security monitoring logs for Bastion Gateway...")
+    generate_failed_ssh_logins()
+    generate_specific_failed_logons()
+    generate_successful_logins()
+    generate_privilege_escalation_logs()
+    generate_system_alerts()
+"@
+
+# Bash command to create and run the Python script
+$BastionCommand = @"
+#!/bin/bash
+echo "Saving the sim traffic script to /tmp..."
+echo "$BastionSimScript" > /tmp/simscript.py
+LOG_FILE="/tmp/runlog.log"
+echo "Adding cron job to schedule the script..."
+echo "*/2 * * * * python3 /tmp/simscript.py >> $LOG_FILE 2>&1") | crontab -
+"@
+
+
+# Execute the command on the Linux VM
+Write-Output "Executing script on the Linux VM bastion-gw01..."
+try {
+    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
+                                    -VMName $bastionName `
+                                    -CommandId "RunShellScript" `
+                                    -ScriptString $BastionCommand
+
+    if ($result) {
+        Write-Output "Command executed successfully. Output:"
+        $result.Value[0].Message | Write-Output
+    } else {
+        Write-Output "Command execution failed or returned no output."
+    }
+} catch {
+    Write-Error "Failed to execute command: $_"
+}
+
+
 
 
 #Acess DC file share under an account with NTLMv1
