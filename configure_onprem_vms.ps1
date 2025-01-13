@@ -840,6 +840,16 @@ $output.Value | ForEach-Object { $_.Message }
 
 
 
+## Logon candice to win10
+$w10script = @"
+net localgroup Administrators "ODOMAIN\candice.kevin" /add
+schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 14:30 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
+schtasks /run /tn "RunCMD"
+"@
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script 
+
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
 
 
 
