@@ -916,6 +916,7 @@ $output.Value | ForEach-Object { $_.Message }
 ## Logon users to win10, setting audit
 $w10script = @"
 net localgroup Administrators "ODOMAIN\candice.kevin" /add
+net localgroup Administrators "ODOMAIN\ssupport" /add
 schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
 schtasks /run /tn "RunCMD"
 schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\ssupport" /rp "$adminPassword"
