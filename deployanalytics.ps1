@@ -133,7 +133,7 @@ $analyticsRuleTemplate = @"
     "resources": [
         {
             "type": "Microsoft.OperationalInsights/workspaces/providers/Microsoft.SecurityInsights/alertRules",
-            "apiVersion": "2023-12-01-preview",
+            "apiVersion": "2023-09-01",
             "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/alertRules/7afdc0da-a34c-44fa-8567-5b30fa5901c1')]",
             "kind": "Scheduled",
             "properties": {
