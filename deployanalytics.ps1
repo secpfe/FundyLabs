@@ -141,7 +141,7 @@ $analyticsRuleTemplate = @"
                 "description": "",
                 "severity": "Medium",
                 "enabled": true,
-                "query": "let PowerShellEvents = SecurityEvent\n | where SystemUserId!='S-1-5-18' \n  | where EventID == 4104\n    | where EventData has_all (\"Invoke-WebRequest\", \"-OutFile\")\n    | where EventData has_any (\".ps1\", \".exe\", \".msi\", \".bat\", \".vbs\", \".dll\", \".zip\", \".jar\")\n    | project TimeGenerated, Computer, SystemUserId, EventData;\nlet LogonEvents = SecurityEvent\n  | where TimeGenerated>ago(1d) \n  | where EventID == 4624\n    | project Computer, TargetUserSid, TargetUserName;\nPowerShellEvents\n| join kind=leftouter LogonEvents on `$left.SystemUserId == `$right.TargetUserSid \n| | distinct TimeGenerated, Computer, Account = TargetUserName, EventData",
+                "query": "let PowerShellEvents = SecurityEvent\n | where SystemUserId!='S-1-5-18' \n  | where EventID == 4104 \n| where EventData has_all (\"Invoke-WebRequest\", \"-OutFile\")\n    | where EventData has_any (\".ps1\", \".exe\", \".msi\", \".bat\", \".vbs\", \".dll\", \".zip\", \".jar\")\n    | project TimeGenerated, Computer, SystemUserId, EventData;\nlet LogonEvents = SecurityEvent\n  | where TimeGenerated>ago(1d) \n  | where EventID == 4624\n    | project Computer, TargetUserSid, TargetUserName;\nPowerShellEvents\n| join kind=leftouter LogonEvents on `$left.SystemUserId == `$right.TargetUserSid \n| distinct TimeGenerated, Computer, Account = TargetUserName, EventData",
                 "queryFrequency": "PT15M",
                 "queryPeriod": "PT15M",
                 "triggerOperator": "GreaterThan",
