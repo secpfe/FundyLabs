@@ -117,3 +117,137 @@ foreach ($template in $allTemplates ) {
     $metaURI = $baseMetaURI + $rule.name + "?api-version=2023-02-01"
     Invoke-RestMethod -Uri $metaURI -Method Put -Headers $AuthHeader -Body ($metabody | ConvertTo-Json -EnumsAsStrings -Depth 5)
 }
+
+
+
+# Define the ARM template for PowerShellDownload custom analytics rule
+$analyticsRuleTemplate = @"
+{
+    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.OperationalInsights/workspaces/providers/Microsoft.SecurityInsights/alertRules",
+            "apiVersion": "2023-12-01-preview",
+            "name": "[concat(parameters('workspace'), '/Microsoft.SecurityInsights/alertRules/7afdc0da-a34c-44fa-8567-5b30fa5901c1')]",
+            "kind": "Scheduled",
+            "properties": {
+                "displayName": "PowerShell was used to download executable files or scripts",
+                "description": "",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let PowerShellEvents = SecurityEvent
+    | where EventID == 4104
+    | where EventData has_all (\"Invoke-WebRequest\", \"-OutFile\")
+    | where EventData has_any (\".ps1\", \".exe\", \".msi\", \".bat\", \".vbs\", \".dll\", \".zip\", \".jar\")
+    | project TimeGenerated, Computer, SystemUserId, EventData;
+let LogonEvents = SecurityEvent
+    | where EventID == 4624
+    | project Computer, TargetUserSid, TargetUserName;
+PowerShellEvents
+| join kind=leftouter LogonEvents on `$left.SystemUserId == `$right.TargetUserSid and `$left.Computer == `$right.Computer
+| project TimeGenerated, Computer, Account = TargetUserName, EventData",
+                "queryFrequency": "PT15M",
+                "queryPeriod": "PT15M",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "Execution"
+                ],
+                "techniques": [
+                    "T1059"
+                ],
+                "subTechniques": [
+                    "T1059.001"
+                ],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": true,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Name",
+                                "columnName": "Account"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "Computer"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}
+"@
+
+# Convert the template string to a JSON object
+$templateObject = $analyticsRuleTemplate | ConvertFrom-Json
+
+# Prepare the parameters by injecting the workspace name
+$deploymentParameters = @{
+    "workspace" = @{
+        "value" = $Workspace
+    }
+} | ConvertTo-Json -Depth 10
+
+# Define the deployment body with mode, template, and parameters
+$deploymentBody = @{
+    "properties" = @{
+        "mode" = "Incremental"
+        "template" = $templateObject
+        "parameters" = ($deploymentParameters | ConvertFrom-Json)
+    }
+} | ConvertTo-Json -Depth 100
+
+#Write-OutPut $deploymentBody
+
+# Define a unique deployment name
+$deploymentName = "DeployPowershellDownloadDetection"
+
+# Construct the deployment URI using subscription and resource group details
+$deploymentUri = "$serverUrl/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Resources/deployments/$deploymentName`?api-version=2021-04-01"
+#Write-OutPut $deploymentUri
+
+# Execute the deployment with error handling
+try {
+    Write-Verbose "Deploying PowershellDownload analytics rule..."
+    Invoke-RestMethod -Method PUT -Uri $deploymentUri -Headers $authHeader -Body $deploymentBody
+    Write-OutPut "✅ PowershellDownload analytics rule deployed successfully." 
+}
+catch {
+    Write-OutPut "❌ Failed to deploy PowershellDownload analytics rule: $_" 
+}
