@@ -122,7 +122,7 @@ foreach ($template in $allTemplates ) {
 # Define the ARM template for PowerShellDownload custom analytics rule
 $analyticsRuleTemplate = @"
 {
-    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
         "workspace": {
@@ -141,7 +141,7 @@ $analyticsRuleTemplate = @"
                 "description": "",
                 "severity": "Medium",
                 "enabled": true,
-                "query": "let PowerShellEvents = SecurityEvent\n    | where EventID == 4104\n    | where EventData has_all (\"Invoke-WebRequest\", \"-OutFile\")\n    | where EventData has_any (\".ps1\", \".exe\", \".msi\", \".bat\", \".vbs\", \".dll\", \".zip\", \".jar\")\n    | project TimeGenerated, Computer, SystemUserId, EventData;\nlet LogonEvents = SecurityEvent\n    | where EventID == 4624\n    | project Computer, TargetUserSid, TargetUserName;\nPowerShellEvents\n| join kind=leftouter LogonEvents on $left.SystemUserId == $right.TargetUserSid and $left.Computer == $right.Computer\n| project TimeGenerated, Computer, Account = TargetUserName, EventData",
+                "query": "let PowerShellEvents = SecurityEvent\n    | where EventID == 4104\n    | where EventData has_all (\"Invoke-WebRequest\", \"-OutFile\")\n    | where EventData has_any (\".ps1\", \".exe\", \".msi\", \".bat\", \".vbs\", \".dll\", \".zip\", \".jar\")\n    | project TimeGenerated, Computer, SystemUserId, EventData;\nlet LogonEvents = SecurityEvent\n    | where EventID == 4624\n    | project Computer, TargetUserSid, TargetUserName;\nPowerShellEvents\n| join kind=leftouter LogonEvents on `$left.SystemUserId == `$right.TargetUserSid and `$left.Computer == `$right.Computer\n| project TimeGenerated, Computer, Account = TargetUserName, EventData",
                 "queryFrequency": "PT15M",
                 "queryPeriod": "PT15M",
                 "triggerOperator": "GreaterThan",
