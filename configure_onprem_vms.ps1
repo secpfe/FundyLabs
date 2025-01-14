@@ -181,6 +181,7 @@ try {
 $resourceGroupName = "CyberSOC"
 $workspaceName = "CyberSOCWS"
 $dcrName = "Minimal-Servers"
+$powershellDcrName = "PowerShellLogs"
 $linuxDcrName = "Minimal-Linux"
 $DCDcrName = "Additional-DC"
 
@@ -228,6 +229,51 @@ $jsonContent = @"
                         "Security!*[System[(EventID=5033) or (EventID=8222)]]",
                         "Microsoft-Windows-AppLocker/EXE and DLL!*[System[(EventID=8001) or (EventID=8002) or (EventID=8003) or (EventID=8004)]]",
                         "Microsoft-Windows-AppLocker/MSI and Script!*[System[(EventID=8005) or (EventID=8006) or (EventID=8007)]]"
+                    ],
+                    "name": "eventLogsDataSource"
+                }
+            ]
+        },
+        "destinations": {
+            "logAnalytics": [
+                {
+                    "workspaceResourceId": "$workspaceResourceId",
+                    "workspaceId": "$workspaceId",
+                    "name": "DataCollectionEvent"
+                }
+            ]
+        },
+        "dataFlows": [
+            {
+                "streams": [
+                    "Microsoft-SecurityEvent"
+                ],
+                "destinations": [
+                    "DataCollectionEvent"
+                ]
+            }
+        ]
+    }
+}
+"@
+
+# Define the JSON content 
+$powershellDCRJsonContent = @"
+{
+    "kind": "Windows",
+    "location": "$location",
+    "tags": {
+        "createdBy": "Sentinel"
+    },
+    "properties": {
+        "dataSources": {
+            "windowsEventLogs": [
+                {
+                    "streams": [
+                        "Microsoft-SecurityEvent"
+                    ],
+                    "xPathQueries": [
+                        "Microsoft-Windows-PowerShell/Operational!*[System[(EventID=4104)]]"
                     ],
                     "name": "eventLogsDataSource"
                 }
@@ -413,7 +459,40 @@ foreach ($vmName in $vmNames) {
 }
 
 
-# Deploy Azure Monitor Agent to the VMs
+# Windows 10 Powershell DCR
+New-AzDataCollectionRule -Name $powershellDcrName -ResourceGroupName $resourceGroupName -JsonString $powershellDCRJsonContent
+$win10name="win10"
+
+
+# Retrieve the ImmutableId for the DCR
+$powershellDCR = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $powershellDcrName
+if (!$powershellDCR) {
+    Write-Output "DCR '$powershellDcrName' not found in Resource Group '$resourceGroupName'." 
+}
+
+$powershellDataCollectionRuleId = $powershellDCR.Id
+
+
+# Add Powershell DCR association to Win10 VMs
+$win10 = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $win10name
+if (!$win10) {
+    Write-Output "VM '$win10name' not found in Resource Group '$resourceGroupNameOps'." 
+}
+
+# Build the association
+$targetWin10ResourceId = $win10.Id
+$Win10PowershellassociationName = "win10-DCR-Association"
+# Create DCR association
+New-AzDataCollectionRuleAssociation -TargetResourceId $targetWin10ResourceId -DataCollectionRuleId $powershellDataCollectionRuleId -AssociationName $Win10PowershellassociationName
+
+Write-Output "DCR Association '$Win10PowershellassociationName' created for VM '$win10name' using Id." 
+
+
+
+
+# -----------------------------------------
+# - Deploy Azure Monitor Agent to the VMs -
+# -----------------------------------------
 foreach ($vmName in $vmNames) {
     # Enable the Azure Monitor extension
     $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
@@ -428,7 +507,11 @@ foreach ($vmName in $vmNames) {
 }
 
 
-#Linux DCR part
+
+# -----------------------------------------
+# ----    Linux DCR part      -------------
+# -----------------------------------------
+
 New-AzDataCollectionRule -Name $linuxDcrName -ResourceGroupName $resourceGroupName -JsonString $linuxJsonContent
 
 # Add DCR association to VMs
@@ -454,26 +537,13 @@ if (!$web01) {
 $targetLinuxResourceId = $web01.Id
 $LinuxassociationName = "web01-DCR-Association"
 # Create DCR association
-New-AzDataCollectionRuleAssociation -TargetResourceId $targetLinuxResourceId `
-    -DataCollectionRuleId $linuxDataCollectionRuleId `
-    -AssociationName $LinuxassociationName
-
-    Write-Output "DCR Association '$LinuxassociationName' created for VM '$web01Name' using Id." 
+New-AzDataCollectionRuleAssociation -TargetResourceId $targetLinuxResourceId -DataCollectionRuleId $linuxDataCollectionRuleId -AssociationName $LinuxassociationName
+Write-Output "DCR Association '$LinuxassociationName' created for VM '$web01Name' using Id." 
 
 
 # Deploy Azure Monitor Agent to the Linux VM
-$extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
-    -VMName $web01Name `
-    -Name "AzureMonitorLinuxAgent" `
-    -Publisher "Microsoft.Azure.Monitor" `
-    -ExtensionType "AzureMonitorLinuxAgent" `
-    -TypeHandlerVersion "1.0" `
-    -Location $location
-
+$extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $web01Name -Name "AzureMonitorLinuxAgent" -Publisher "Microsoft.Azure.Monitor"     -ExtensionType "AzureMonitorLinuxAgent"     -TypeHandlerVersion "1.0"     -Location $location
 Write-Output "Azure Monitor Agent deployed for VM '$web01Name'." 
-
-
-
 
 
 
