@@ -671,7 +671,7 @@ Import-Module ActiveDirectory
                'Security Analyst', 'Procurement Specialist')
 `$UserAccounts = @('Alice Johnson', 'Bob Smith', 'Charlie Brown', 'Diana Prince', 'Eve Adams', 'Frank Castle', 'Grace Hopper', 'Hank Pym', 'Ivy Bell', 'Jack Reacher',
                   'Karen Miller', 'Leo Tolstoy', 'Maya Angelou', 'Neil Armstrong', 'Olivia Wilde', 'Paul Atreides', 'Quincy Jones', 'Rose Tyler', 'Sam Wilson', 'Tina Turner',
-                  'Uma Thurman', 'Victor Hugo', 'Wendy Darling', 'Xander Harris', 'Yara Greyjoy')
+                  'Uma Thurman', 'Victor Hugo', 'Wendy Darling', 'Xander Harris', 'Yara Greyjoy', 'Support Support')
 `$CandiceKevin = @{'Name' = 'Candice Kevin'; 'SamAccountName' = 'candice.kevin'; 'Title' = 'HR Executive'}
 `$JonSmith = @{'Name' = 'Jon Smith'; 'SamAccountName' = 'jon'}
 `$BatchAccount = @{'Name' = 'DA Batch'; 'SamAccountName' = 'da-batch'}
@@ -915,6 +915,8 @@ $w10script = @"
 net localgroup Administrators "ODOMAIN\candice.kevin" /add
 schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
 schtasks /run /tn "RunCMD"
+schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\ssupport" /rp "$adminPassword"
+schtasks /run /tn "RunCMD2"
 New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -force
 Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 1 -Type DWord
 gpupdate /force
@@ -1221,4 +1223,121 @@ Write-Output "`n[+] Done. There should be Event Log for a Type 2 logon, and the 
 
 
 $output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script
+$output.Value | ForEach-Object { $_.Message }
+
+
+
+# Simulate Support PersonnelLogon
+$SupportUserName = "ODOMAIN\ssupport"
+
+$w10script2=@"
+`$UserName    = "$SupportUserName"
+`$Password    = "$adminPassword"
+
+
+# -----------------------
+# STEP 1: Add P/Invoke definitions
+# -----------------------
+Add-Type -TypeDefinition `@"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+
+public class NativeMethods {
+    [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern bool LogonUser(
+        string lpszUsername,
+        string lpszDomain,
+        string lpszPassword,
+        int dwLogonType,
+        int dwLogonProvider,
+        out IntPtr phToken);
+
+    [DllImport("kernel32.dll", CharSet=CharSet.Auto, SetLastError=true)]
+    public static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern bool CreateProcessAsUser(
+        IntPtr hToken,
+        string lpApplicationName,
+        string lpCommandLine,
+        IntPtr lpProcessAttributes,
+        IntPtr lpThreadAttributes,
+        bool bInheritHandles,
+        int dwCreationFlags,
+        IntPtr lpEnvironment,
+        string lpCurrentDirectory,
+        ref STARTUPINFO lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_INFORMATION {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public int dwProcessId;
+        public int dwThreadId;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+    public struct STARTUPINFO {
+        public int cb;
+        public string lpReserved;
+        public string lpDesktop;
+        public string lpTitle;
+        public int dwX;
+        public int dwY;
+        public int dwXSize;
+        public int dwYSize;
+        public int dwXCountChars;
+        public int dwYCountChars;
+        public int dwFillAttribute;
+        public int dwFlags;
+        public short wShowWindow;
+        public short cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput;
+        public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+
+    // Logon types
+    public const int LOGON32_LOGON_INTERACTIVE = 2;
+    public const int LOGON32_PROVIDER_DEFAULT  = 0;
+}
+"`@
+
+# -----------------------
+# STEP 1: LogonUser (Interactive) for ssupport
+# -----------------------
+Write-Host "`n[+] Attempting interactive logon for user: `$UserName"
+
+`$domain = ""
+`$user   = `$UserName
+if (`$UserName -like "*\*") {
+    `$domain = `$UserName.Split("\")[0]
+    `$user   = `$UserName.Split("\")[1]
+}
+
+[IntPtr]`$userToken = [IntPtr]::Zero
+`$logonOk = [NativeMethods]::LogonUser(
+    `$user,
+    `$domain,
+    `$Password,
+    [NativeMethods]::LOGON32_LOGON_INTERACTIVE,
+    [NativeMethods]::LOGON32_PROVIDER_DEFAULT,
+    [ref] `$userToken
+)
+
+if (!`$logonOk) {
+    `$err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    throw "LogonUser (interactive) failed. Win32 error: `$err"
+}
+
+Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserName."
+
+Write-Output "`n[+] Done. There should be Event Log for a Type 2 logon for `$UserName."
+"@
+
+
+$output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script2
 $output.Value | ForEach-Object { $_.Message }
