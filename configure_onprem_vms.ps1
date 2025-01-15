@@ -227,6 +227,8 @@ $jsonContent = @"
                         "Security!*[System[(EventID=1102) or (EventID=4624) or (EventID=4625) or (EventID=4657) or (EventID=4663) or (EventID=4688) or (EventID=4700) or (EventID=4702) or (EventID=4719) or (EventID=4720) or (EventID=4722) or (EventID=4723) or (EventID=4724) or (EventID=4727) or (EventID=4728)]]",
                         "Security!*[System[(EventID=4732) or (EventID=4735) or (EventID=4737) or (EventID=4739) or (EventID=4740) or (EventID=4754) or (EventID=4755) or (EventID=4756) or (EventID=4767) or (EventID=4799) or (EventID=4825) or (EventID=4946) or (EventID=4948) or (EventID=4956) or (EventID=5024)]]",
                         "Security!*[System[(EventID=5033) or (EventID=8222)]]",
+                        "Security!*[System[(EventID=4674) or (EventID=4678)]]",
+                        "System!*[System[(EventID=7036)]]",
                         "Microsoft-Windows-AppLocker/EXE and DLL!*[System[(EventID=8001) or (EventID=8002) or (EventID=8003) or (EventID=8004)]]",
                         "Microsoft-Windows-AppLocker/MSI and Script!*[System[(EventID=8005) or (EventID=8006) or (EventID=8007)]]"
                     ],
@@ -826,6 +828,9 @@ Write-Output "Setting Advanced Audit Policies..."
 # Detailed tracking
 & auditpol.exe /set /subcategory:"Process Creation" /success:enable /failure:enable
 
+# Privilege use
+& auditpol.exe /set /subcategory:"Sensitive Privilege Use" /success:enable /failure:enable
+
 # Account Logon
 & auditpol.exe /set /subcategory:"Kerberos Service Ticket Operations" /success:enable /failure:enable
 & auditpol.exe /set /subcategory:"Kerberos Authentication Service" /success:enable /failure:enable
@@ -883,6 +888,25 @@ $output.Value | ForEach-Object { $_.Message }
 
 #Downgrade to NTLM and access DC file share under an account with NTLM
 $mservscript = @"
+# Enable File and Printer sharing
+netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=Yes
+# Add ssupport to local admins
+net localgroup Administrators "ODOMAIN\ssupport" /add
+
+
+Write-Output "Setting Advanced Audit Policies..."
+
+# Logon/Logoff
+& auditpol.exe /set /subcategory:"Logon" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Logoff" /success:disable
+& auditpol.exe /set /subcategory:"Special Logon" /success:enable /failure:enable
+
+# Detailed tracking
+& auditpol.exe /set /subcategory:"Process Creation" /success:enable /failure:enable
+
+# Privilege use
+& auditpol.exe /set /subcategory:"Sensitive Privilege Use" /success:enable /failure:enable
+
 `$regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa"
 `$regValue = "LmCompatibilityLevel"
 
@@ -915,16 +939,33 @@ $output.Value | ForEach-Object { $_.Message }
 
 ## Logon users to win10, setting audit
 $w10script = @"
+Write-Output "Setting Advanced Audit Policies..."
+# Logon/Logoff
+& auditpol.exe /set /subcategory:"Logon" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Logoff" /success:disable
+& auditpol.exe /set /subcategory:"Special Logon" /success:enable /failure:enable
+
+# Detailed tracking
+& auditpol.exe /set /subcategory:"Process Creation" /success:enable /failure:enable
+
+# Privilege use
+& auditpol.exe /set /subcategory:"Sensitive Privilege Use" /success:enable /failure:enable
+
+Write-Output "Enabling scriptblock logging..."
+New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -force
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 1 -Type DWord
+
+gpupdate /force
+
+Write-Output "Adding users to Local Admins..."
 net localgroup Administrators "ODOMAIN\candice.kevin" /add
 net localgroup Administrators "ODOMAIN\ssupport" /add
+
+Write-Output "Creating scheduled tasks to simulate logons..."
 schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
 schtasks /run /tn "RunCMD"
 schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\ssupport" /rp "$adminPassword"
 schtasks /run /tn "RunCMD2"
-New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -force
-Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 1 -Type DWord
-& auditpol.exe /set /subcategory:"Process Creation" /success:enable /failure:enable
-gpupdate /force
 "@
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script 
 
@@ -984,6 +1025,7 @@ pip3 install ldap3
 echo "$PythonScript" > /tmp/temp_script.py
 python3 /tmp/temp_script.py
 sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
+sudo /root/.local/bin/secretsdump.py 'ODOMAIN/ssupport:$adminPassword'@10.0.0.5
 unset DEBIAN_FRONTEND 
 "@
 
@@ -1014,6 +1056,7 @@ $mservscript = @"
 `$FileSharePath = "\\10.0.0.4\HealthReports"
 `$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
 `$Credential = New-Object System.Management.Automation.PSCredential ("odomain\da-batch", `$securePassword)
+
 
 # Directly access the file share with the specified credentials
 `$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
@@ -1240,6 +1283,20 @@ $w10script2=@"
 `$Password    = "$adminPassword"
 
 
+Write-Output "[+] Emulating RS running under candice..."
+schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
+
+`$Path = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe"
+`$task = Get-ScheduledTask -TaskName "RunReverseShell"
+`$newAction = New-ScheduledTaskAction -Execute `$Path 
+Set-ScheduledTask -TaskName "RunReverseShell" -Action `$newAction -Trigger `$task.Triggers -User 'ODOMAIN\candice.kevin' -Password `$Password
+
+Start-ScheduledTask -TaskName "RunReverseShell"
+schtasks /run /tn "RunReverseShell"
+
+Write-Output "`n[+] There should be 4688 events for rs.exe."
+
+
 # -----------------------
 # STEP 1: Add P/Invoke definitions
 # -----------------------
@@ -1340,21 +1397,6 @@ if (!`$logonOk) {
 
 Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserName."
 Write-Output "`n[+] There should be Event Log for a Type 2 logon for `$UserName."
-
-Write-Output "[+] Emulating RS running under candice..."
-schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
-
-`$Path = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe"
-`$task = Get-ScheduledTask -TaskName "RunReverseShell"
-`$newAction = New-ScheduledTaskAction -Execute `$Path 
-Set-ScheduledTask -TaskName "RunReverseShell" -Action `$newAction -Trigger `$task.Triggers -User 'ODOMAIN\candice.kevin' -Password `$Password
-
-Start-ScheduledTask -TaskName "RunReverseShell"
-schtasks /run /tn "RunReverseShell"
-
-Write-Output "`n[+] There should be 4688 events for rs.exe."
-
-
 "@
 
 
