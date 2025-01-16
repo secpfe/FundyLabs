@@ -1159,8 +1159,8 @@ param(
 )
 Write-Output "Downloading from ```$DownloadUrl..."
 
-# Startup folder for the *current* user 
-```$startupFolder = Join-Path ```$env:USERPROFILE "AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup"
+# Startup folder 
+```$startupFolder = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
 if (!(Test-Path ```$startupFolder)) {
     New-Item -ItemType Directory -Path ```$startupFolder -Force | Out-Null
 }
