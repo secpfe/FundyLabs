@@ -1017,6 +1017,9 @@ foreach (`$user in `$users) {
         Write-Output "Copying Default Profile to `$profilePath..."
         `$robocopyCommand = "robocopy `$defaultProfile `$profilePath /MIR /SEC /XJ /XD 'Application Data'"
         Invoke-Expression `$robocopyCommand
+        `$currentAttributes = (Get-Item `$profilePath).Attributes
+        `$newAttributes = `$currentAttributes -band -bnot ([System.IO.FileAttributes]::Hidden + [System.IO.FileAttributes]::System)
+        (Get-Item `$profilePath).Attributes = `$newAttributes
         #Copy-Item -Recurse -Force `$defaultProfile `$profilePath
     } else {
         Write-Output "Profile already exists at `$profilePath."
