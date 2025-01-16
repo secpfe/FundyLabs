@@ -962,10 +962,7 @@ net localgroup Administrators "ODOMAIN\candice.kevin" /add
 net localgroup Administrators "ODOMAIN\ssupport" /add
 
 
-#schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
-#schtasks /run /tn "RunCMD"
-#schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\ssupport" /rp "$adminPassword"
-#schtasks /run /tn "RunCMD2"
+
 
 Write-Output "Creating profiles for candice.kevin and ssupport...."
 # Define domain users and their profile paths
@@ -1044,6 +1041,11 @@ foreach (`$user in `$users) {
 
     Write-Output "Profile setup complete for `$userName."
 }
+
+schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
+schtasks /run /tn "RunCMD"
+schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\ssupport" /rp "$adminPassword"
+schtasks /run /tn "RunCMD2"
 
 Write-Output "All profiles created successfully!"
 
