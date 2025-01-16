@@ -971,8 +971,8 @@ Write-Output "Creating profiles for candice.kevin and ssupport...."
 # Define domain users and their profile paths
 `$users = `@(
     `@{
-        UserName = "ODOMAIN\candice.keving"
-        ProfilePath = "C:\Users\candice.keving"
+        UserName = "ODOMAIN\candice.kevin"
+        ProfilePath = "C:\Users\candice.kevin"
     },
     `@{
         UserName = "ODOMAIN\ssupport"
