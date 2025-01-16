@@ -575,7 +575,7 @@ $domainJoinScript = @"
 
 # Set registry values for auto-logon
 Set-ItemProperty -Path `$autoLogonKey -Name "DefaultUserName" -Value "`$CandiceUsername"
-Set-ItemProperty -Path `$autoLogonKey -Name "DefaultDomainName" -Value "$domainName"
+Set-ItemProperty -Path `$autoLogonKey -Name "DefaultDomainName" -Value "odomain.local"
 Set-ItemProperty -Path `$autoLogonKey -Name "DefaultPassword" -Value "$domainAdminPassword"
 Set-ItemProperty -Path `$autoLogonKey -Name "AutoAdminLogon" -Value "1"
 
