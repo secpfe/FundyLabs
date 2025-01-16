@@ -961,11 +961,92 @@ Write-Output "Adding users to Local Admins..."
 net localgroup Administrators "ODOMAIN\candice.kevin" /add
 net localgroup Administrators "ODOMAIN\ssupport" /add
 
-Write-Output "Creating scheduled tasks to simulate logons..."
-schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
-schtasks /run /tn "RunCMD"
-schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\ssupport" /rp "$adminPassword"
-schtasks /run /tn "RunCMD2"
+
+#schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
+#schtasks /run /tn "RunCMD"
+#schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\ssupport" /rp "$adminPassword"
+#schtasks /run /tn "RunCMD2"
+
+Write-Output "Creating profiles for candice.kevin and ssupport...."
+# Define domain users and their profile paths
+`$users = `@(
+    `@{
+        UserName = "ODOMAIN\candice.keving"
+        ProfilePath = "C:\Users\candice.keving"
+    },
+    `@{
+        UserName = "ODOMAIN\ssupport"
+        ProfilePath = "C:\Users\ssupport"
+    }
+)
+
+# Define the default profile path
+`$defaultProfile = "C:\Users\Default"
+
+# Function to get the user's SID
+function Get-UserSID {
+    param (
+        [string]`$UserName
+    )
+    `$user = New-Object System.Security.Principal.NTAccount(`$UserName)
+    `$sid = `$user.Translate([System.Security.Principal.SecurityIdentifier])
+    return `$sid.Value
+}
+
+# Function to set registry profile information
+function Set-RegistryProfile {
+    param (
+        [string]`$SID,
+        [string]`$ProfilePath
+    )
+    `$regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\`$SID"
+    if (!(Test-Path `$regPath)) {
+        New-Item -Path `$regPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path `$regPath -Name "ProfileImagePath" -Value `$ProfilePath
+    Set-ItemProperty -Path `$regPath -Name "Flags" -Value 0
+    Set-ItemProperty -Path `$regPath -Name "State" -Value 0
+}
+
+# Iterate over each user
+foreach (`$user in `$users) {
+    `$userName = `$user.UserName
+    `$profilePath = `$user.ProfilePath
+
+    Write-Output "Processing user: `$userName"
+
+    # 1. Copy the Default Profile
+    if (!(Test-Path `$profilePath)) {
+        Write-Output "Copying Default Profile to `$profilePath..."
+        `$robocopyCommand = "robocopy `$defaultProfile `$profilePath /MIR /SEC /XJ /XD 'Application Data'"
+        Invoke-Expression `$robocopyCommand
+        #Copy-Item -Recurse -Force `$defaultProfile `$profilePath
+    } else {
+        Write-Output "Profile already exists at `$profilePath."
+    }
+
+    # 2. Get the User's SID
+    `$sid = Get-UserSID -UserName `$userName
+    Write-Output "User SID for `$userName : `$sid"
+
+    # 3. Set the Profile Path in the Registry
+    Write-Output "Setting registry for profile..."
+    Set-RegistryProfile -SID `$sid -ProfilePath `$profilePath
+
+    # 4. Set Permissions for the User
+    Write-Output "Setting permissions for `$userName on `$profilePath..."
+    `$acl = Get-Acl `$profilePath
+    `$accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+        `$userName, "FullControl", "ContainerInherit, ObjectInherit", "None", "Allow"
+    )
+    `$acl.SetAccessRule(`$accessRule)
+    Set-Acl -Path `$profilePath -AclObject `$acl
+
+    Write-Output "Profile setup complete for `$userName."
+}
+
+Write-Output "All profiles created successfully!"
+
 "@
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script 
 
