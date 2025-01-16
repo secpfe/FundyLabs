@@ -1011,12 +1011,14 @@ foreach (`$user in `$users) {
     `$profilePath = `$user.ProfilePath
 
     Write-Output "Processing user: `$userName"
+    Write-Output "Profile Path: '`$profilePath'"
 
     # 1. Copy the Default Profile
     if (!(Test-Path `$profilePath)) {
         Write-Output "Copying Default Profile to `$profilePath..."
-        `$robocopyCommand = "robocopy `$defaultProfile `$profilePath /MIR /SEC /XJ /XD 'Application Data'"
-        Invoke-Expression `$robocopyCommand
+        #`$robocopyCommand = "robocopy `$defaultProfile `$profilePath /MIR /SEC /XJ /XD 'Application Data'"
+        #Invoke-Expression `$robocopyCommand
+        Start-Process -FilePath "robocopy" -ArgumentList "`$defaultProfile `$profilePath /MIR /SEC /XJ /XD 'Application Data'" -Wait -NoNewWindow
         `$currentAttributes = (Get-Item `$profilePath).Attributes
         `$newAttributes = `$currentAttributes -band -bnot ([System.IO.FileAttributes]::Hidden + [System.IO.FileAttributes]::System)
         (Get-Item `$profilePath).Attributes = `$newAttributes
@@ -1044,6 +1046,12 @@ foreach (`$user in `$users) {
 
     Write-Output "Profile setup complete for `$userName."
 }
+
+`$startupFolder = "C:\users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
+if (!(Test-Path `$startupFolder)) {
+New-Item -ItemType Directory -Path `$startupFolder -Force
+}
+
 
 schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
 schtasks /run /tn "RunCMD"
