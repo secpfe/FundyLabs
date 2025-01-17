@@ -937,7 +937,6 @@ $Command = @"
 #!/bin/bash
 sudo apt-get update -y
 sudo apt-get install -y python3-pip python3-venv freerdp2-x11 xvfb
-sudo apt-get install -y x11-xserver-utils
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
 export PATH="`$PATH`:`$HOME/.local/bin"
@@ -947,7 +946,7 @@ echo "$PythonScript" > /tmp/temp_script.py
 Xvfb :99 -screen 0 1024x768x16 &
 sleep 30
 su - adm0 -c 'whoami'
-su - adm0 -c 'DISPLAY=:99 xfreerdp'
+su - adm0 -c 'DISPLAY=:99 xfreerdp --version'
 su - adm0 -c 'DISPLAY=:99 timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:'$adminPassword' /dynamic-resolution /cert:ignore &'
 "@
 
