@@ -910,32 +910,15 @@ python3 -m pipx install impacket
 pip3 install ldap3
 echo "$PythonScript" > /tmp/temp_script.py
 Xvfb :99 -screen 0 1024x768x16 &
-export DISPLAY=:99
-timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:$adminPassword /dynamic-resolution /cert:ignore
+export DISPLAY=`:99
+timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:'$adminPassword' /dynamic-resolution /cert:ignore > /tmp/xfreerdp_output.log 2>&1
+echo `$? > /tmp/xfreerdp_exit_code.log
 unset DEBIAN_FRONTEND 
 "@
 
-
-# Execute the command on the Linux VM
-Write-Output "Executing script on the Linux VM web01..."
-try {
-    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
-                                    -VMName $web01Name `
-                                    -CommandId "RunShellScript" `
-                                    -ScriptString $Command
-
-    if ($result) {
-        Write-Output "Command executed successfully. Output:"
-        $result.Value[0].Message | Write-Output
-    } else {
-        Write-Output "Command execution failed or returned no output."
-    }
-} catch {
-    Write-Error "Failed to execute command: $_"
-}
-
-
-
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $web01Name -CommandId "RunShellScript" -ScriptString $Command 
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
 
 
 ##################################################################
