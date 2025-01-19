@@ -243,3 +243,110 @@ try {
 catch {
     Write-OutPut "❌ Failed to deploy PowershellDownload analytics rule: $_" 
 }
+
+
+
+$analyticsRuleTemplate2 = @"
+{
+    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1731ad6c-1eaa-452c-9114-de03dac8244c')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1731ad6c-1eaa-452c-9114-de03dac8244c')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "Rapid Remote Registry service state change",
+                "description": "The Remote Registry service was briefly started and then stopped, which could indicate the use of credential theft tools targeting the endpoint.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let RemoteRegistryEvents = SecurityEvent\r\n| where EventID == 7036\r\n| extend ServiceName = extract(\"<Data Name=\\\"param1\\\">([^<]+)</Data>\", 1, EventData) // Extract the service name\r\n| extend ServiceState = extract(\"<Data Name=\\\"param2\\\">([^<]+)</Data>\", 1, EventData) // Extract the service state\r\n| where ServiceName == \"Remote Registry\" // Match the \"Remote Registry\" service\r\n| project TimeGenerated, Computer, ServiceName, ServiceState;\r\nRemoteRegistryEvents\r\n| join kind=inner (\r\n    RemoteRegistryEvents\r\n) on Computer, ServiceName\r\n| where ServiceState == \"running\" and ServiceState1 == \"stopped\" // Pair running and stopped events\r\n| extend TimeDifference = datetime_diff(\"second\", TimeGenerated1, TimeGenerated) // Calculate the time difference\r\n| where TimeDifference <= 15 and TimeDifference > 0 // Filter pairs within 15 seconds\r\n| project Computer, ServiceName, StartTime = TimeGenerated, StopTime = TimeGenerated1, TimeDifference",
+                "queryFrequency": "PT5M",
+                "queryPeriod": "PT5M",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "LateralMovement"
+                ],
+                "techniques": [
+                    "T1210",
+                    "T1428",
+                    "T0886"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": true,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "Computer"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}
+"@
+
+# Convert the template string to a JSON object
+$templateObject2 = $analyticsRuleTemplate2 | ConvertFrom-Json
+
+# Define the deployment body with mode, template, and parameters
+$deploymentBody2 = @{
+    "properties" = @{
+        "mode" = "Incremental"
+        "template" = $templateObject2
+        "parameters" = ($deploymentParameters | ConvertFrom-Json)
+    }
+} | ConvertTo-Json -Depth 100
+
+
+# Define a unique deployment name
+$deploymentName2 = "DeployRemoteRegistryActivation"
+
+# Construct the deployment URI using subscription and resource group details
+$deploymentUri2 = "$serverUrl/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Resources/deployments/$deploymentName2`?api-version=2021-04-01"
+#Write-OutPut $deploymentUri
+
+# Execute the deployment with error handling
+try {
+    Write-Verbose "Deploying RemoteRegistry analytics rule..."
+    Invoke-RestMethod -Method PUT -Uri $deploymentUri2 -Headers $authHeader -Body $deploymentBody2
+    Write-OutPut "✅ RemoteRegistry analytics rule deployed successfully." 
+}
+catch {
+    Write-OutPut "❌ Failed to deploy RemoteRegistry analytics rule: $_" 
+}
