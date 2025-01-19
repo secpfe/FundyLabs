@@ -971,6 +971,12 @@ netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=
 # Add ssupport to local admins
 net localgroup Administrators "ODOMAIN\ssupport" /add
 
+mkdir c:\backup
+`$downloadBackupExe = "https://github.com/secpfe/FundyLabs/raw/refs/heads/main/backup.exe"
+`$backupExe = "c:\backup\backup.exe"
+`$webClient = New-Object System.Net.WebClient
+`$webClient.DownloadFile(`$downloadBackupExe, `$backupExe)
+`$webClient.Dispose()
 
 Write-Output "Setting Advanced Audit Policies..."
 
