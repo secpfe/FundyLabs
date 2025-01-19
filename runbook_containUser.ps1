@@ -1,15 +1,15 @@
 param(
   [Parameter(Mandatory=$true)]
-  [string] $UserUPN
+  [string] $userName
 )
 
 Connect-AzAccount -Identity
 
-Write-Output "Disabling account for $($UserUPN)"
+Write-Output "Disabling account for $($userName)"
 
 $script=@"
 Import-Module ActiveDirectory
-Disable-ADAccount -Identity $UserUPN 
+Disable-ADAccount -Identity $userName 
 "@
 
 $output = Invoke-AzVMRunCommand -ResourceGroupName ITOperations -VMName "dc" -CommandId "RunPowerShellScript" -ScriptString $script
