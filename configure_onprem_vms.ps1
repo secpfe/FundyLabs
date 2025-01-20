@@ -758,7 +758,8 @@ Write-Output "User `$(`$BatchAccount.Name) added to group Domain Admins"
 
 New-ADUser -Name `$ReportAccount.Name -SamAccountName `$ReportAccount.SamAccountName -UserPrincipalName "`$(`$ReportAccount.SamAccountName)@`$domainDNS" -AccountPassword (ConvertTo-SecureString "`$pwd" -AsPlainText -Force) -Enabled `$true -Path "OU=Admins,OU=Corp,`$domainDN" 
 Write-Output "User `$(`$ReportAccount.Name) created in Admins OU"
-
+Add-ADGroupMember -Identity 'Server Operators' -Members `$ReportAccount.SamAccountName 
+Write-Output "User `$(`$ReportAccount.Name) added to group Server Operators"
 
 # Create computer accounts in Servers OU
 foreach (`$computer in `$ComputerAccounts) {
