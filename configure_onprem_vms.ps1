@@ -68,6 +68,8 @@ $SetupBastionScript = {
     $resourceGroupNameOps = "ITOperations"
     $bastionName = "bastion-gw01"
 
+    
+
     $BastionSimScript = @"
 import os
 import time
@@ -480,11 +482,9 @@ $AMAOnboardingScript = {
 }
 
 # Start parallel jobs
-$jobs = @(
-    Start-Job -Name "SetupBastion" -ScriptBlock $SetupBastionScript,
-    Start-Job -Name "SetupDCRs" -ScriptBlock $DCRsScript,
-    Start-Job -Name "AMAOnboarding" -ScriptBlock $AMAOnboardingScript
-)
+Start-Job -Name "SetupBastion" -ScriptBlock $SetupBastionScript
+Start-Job -Name "SetupDCRs" -ScriptBlock $DCRsScript
+Start-Job -Name "AMAOnboarding" -ScriptBlock $AMAOnboardingScript
 
 # Monitor job completion
 Get-Job | Wait-Job
