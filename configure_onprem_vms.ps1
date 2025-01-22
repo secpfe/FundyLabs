@@ -65,7 +65,7 @@ Write-Output "Initiating Step 2..."
 
 # Full script for Bastion server configuration
 $SetupBastionScript = {
-    $resourceGroupName = "CyberSOC"
+    $resourceGroupNameOps = "ITOperations"
     $bastionName = "bastion-gw01"
 
     $BastionSimScript = @"
@@ -181,7 +181,7 @@ EOF
 (crontab -l; echo "*/2 * * * * python3 /tmp/simscript.py >> /tmp/runlog.log 2>&1") | crontab -
 "@
 
-    Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $bastionName -CommandId "RunShellScript" -ScriptString $BastionCommand
+    Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupNameOps -VMName $bastionName -CommandId "RunShellScript" -ScriptString $BastionCommand
 }
 
 
@@ -194,7 +194,9 @@ $DCRsScript = {
     $powershellDcrName = "PowerShellLogs"
     $linuxDcrName = "Minimal-Linux"
     $DCDcrName = "Additional-DC"
+    $DCvmName = "DC"
     $web01Name = "web01"
+    $win10name="win10"
     $vmNames = @("mserv", "win10", "dc")
     # Get the resource group location
     $resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
