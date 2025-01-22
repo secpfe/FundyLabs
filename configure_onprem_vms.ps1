@@ -65,6 +65,8 @@ Write-Output "Initiating Step 2..."
 
 # Full script for Bastion server configuration
 $SetupBastionScript = {
+    param($inheritedContext)
+    Set-AzContext -Context $inheritedContext
     $resourceGroupNameOps = "ITOperations"
     $bastionName = "bastion-gw01"
 
@@ -189,6 +191,8 @@ EOF
 
 # Full Script for creating all DCRs and adding all the associations
 $DCRsScript = {
+    param($inheritedContext)
+    Set-AzContext -Context $inheritedContext
     $resourceGroupName = "CyberSOC"
     $resourceGroupNameOps = "ITOperations"
     $workspaceName = "CyberSOCWS"
@@ -464,6 +468,18 @@ $DCRsScript = {
 
 # Full script for AMA onbording
 $AMAOnboardingScript = {
+    param($inheritedContext)
+    Set-AzContext -Context $inheritedContext
+    $vmNames = @("mserv", "win10", "dc")
+    $resourceGroupName = "CyberSOC"
+    $resourceGroupNameOps = "ITOperations"
+    $web01Name = "web01"
+    $vmNames = @("mserv", "win10", "dc")
+    # Get the resource group location
+    $resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
+    $location = $resourceGroup.Location
+
+
     foreach ($vmName in $vmNames) {
         # Enable the Azure Monitor extension for Windows VMs
         Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
@@ -481,21 +497,18 @@ $AMAOnboardingScript = {
     Write-Output "Azure Monitor Agent deployed for VM '$web01Name'." 
 }
 
+$ctx = Get-AzContext
+
 # Start parallel jobs
-Start-Job -Name "SetupBastion" -ScriptBlock $SetupBastionScript
-Start-Job -Name "SetupDCRs" -ScriptBlock $DCRsScript
-Start-Job -Name "AMAOnboarding" -ScriptBlock $AMAOnboardingScript
+Start-Job -Name "SetupBastion" -ScriptBlock $SetupBastionScript -ArgumentList $ctx
+Start-Job -Name "SetupDCRs" -ScriptBlock $DCRsScript -ArgumentList $ctx
+Start-Job -Name "AMAOnboarding" -ScriptBlock $AMAOnboardingScript -ArgumentList $ctx
 
-# Monitor job completion
 Get-Job | Wait-Job
-
-# Retrieve outputs and handle errors
 Get-Job | ForEach-Object {
-    if ($_.State -eq 'Failed') {
-        Write-Error "Job $_ failed: $($_.Error)"
-    } else {
-        Receive-Job -Job $_ | Write-Output
-    }
+    "=== JOB: $($_.Name) ==="
+    Receive-Job $_ -Keep
+    "========================`n"
 }
 
 Write-Output "All parallel tasks completed successfully!"
