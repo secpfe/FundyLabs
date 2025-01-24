@@ -506,7 +506,7 @@ $AMAOnboardingScript = {
 #Start-Job -Name "AMAOnboarding" -ScriptBlock $AMAOnboardingScript -ArgumentList $ctx
 $SetupBastionScript.Invoke()
 $DCRsScript.Invoke()
-$AMAOnboardingScript()
+$AMAOnboardingScript.Invoke()
 
 #Get-Job | Wait-Job
 #Get-Job | ForEach-Object {
