@@ -7,9 +7,7 @@ param (
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Starting Orchestration Runbook..."
 
-Import-Module Az.Compute
 Import-Module Az.Accounts
-Import-Module Az.Monitor
 Connect-AzAccount -Identity
 
 $DCvmName = "DC"
@@ -33,6 +31,37 @@ $workspaceId = $workspace.CustomerId
 
 
 
+# Function to wait for a job to complete
+function Wait-ForAutomationJob {
+    param (
+        [string]$AutomationAccountName,
+        [string]$ResourceGroupName,
+        [Guid]$JobId,
+        [string]$RunBookName
+    )
+
+    while ($true) {
+        # Retrieve the job status
+        $job = Get-AzAutomationJob -AutomationAccountName $automationAccountName -ResourceGroupName $resourceGroupName -Id $jobId
+
+        Write-Output "Job $RunBookName Status: $($job.Status)"
+
+        if ($job.Status -eq "Completed") {
+            Write-Output "Job completed successfully!"
+            break
+        } elseif ($job.Status -eq "Failed") {
+            Write-Output "Job failed. Check logs for details."
+            break
+        } elseif ($job.Status -eq "Stopped" -or $job.Status -eq "Suspended") {
+            Write-Output "Job was stopped or suspended."
+            break
+        }
+
+        # Wait for a few seconds before checking again
+        Start-Sleep -Seconds 15
+    }
+}
+
 #######################################
 # Step 1. Promote a domain controller
 #######################################
@@ -47,7 +76,7 @@ Write-Output "Initiating Step 1..."
 #)
 
 $dcJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_PromoteDC" -ResourceGroupName "Orchestrator" -Parameters @{
-        $adminPassword = $adminPassword
+        adminPassword = $adminPassword
         domainName     = "odomain.local"
         DCvmName          = $DCvmName
         resourceGroupName = $resourceGroupNameOps
@@ -73,9 +102,9 @@ $amaJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccoun
 $bastionJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_Bastion" -ResourceGroupName "Orchestrator" 
 
 # Wait for All Jobs to Complete
-Wait-AzAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $dcrJob.JobId
-Wait-AzAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $amaJob.JobId
-Wait-AzAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $bastionJob.JobId
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $dcrJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "DCRs"
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $amaJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "AMA"
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $bastionJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "Bastion"
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 2 completed successfully!"
 
@@ -105,12 +134,11 @@ $domainJoinJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestrato
     adminAccount = $adminAccount
     adminPassword = $adminPassword
     domainName     = "odomain.local"
-    DCvmName          = $DCvmName
     resourceGroupName = $resourceGroupNameOps
 }
 
 
-Wait-AzAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $domainJoinJob.JobId
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -ResourceGroupName "Orchestrator" -JobId $domainJoinJob.JobId -RunBookName "Domain Join"
 
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 3 tasks completed successfully!"

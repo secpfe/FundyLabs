@@ -122,4 +122,19 @@ EOF
 (crontab -l; echo "*/2 * * * * python3 /tmp/simscript.py >> /tmp/runlog.log 2>&1") | crontab -
 "@
 
-Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupNameOps -VMName $bastionName -CommandId "RunShellScript" -ScriptString $BastionCommand
+
+
+# Execute the command on the Linux VM
+Write-Output "Executing script on the Linux VM bastion-gw01..."
+try {
+    $result = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupNameOps -VMName $bastionName -CommandId "RunShellScript" -ScriptString $BastionCommand
+
+    if ($result) {
+        Write-Output "Command executed successfully. Output:"
+        $result.Value[0].Message | Write-Output
+    } else {
+        Write-Output "Command execution failed or returned no output."
+    }
+} catch {
+    Write-Error "Failed to execute command: $_"
+}
