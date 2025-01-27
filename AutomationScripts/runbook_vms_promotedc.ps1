@@ -2,15 +2,21 @@ param (
     [string]$adminPassword,
     [string]$domainName,
     [string]$DCvmName,
-    [string]$resourceGroupName
+    [string]$resourceGroupName,
+    [string]$location
 )
 
 
 Import-Module Az.Compute
 Import-Module Az.Accounts
+Import-Module Az.Monitor
 
 Connect-AzAccount -Identity
 
+
+Set-AzVMExtension -ResourceGroupName "ITOperations" -VMName "dc" -Name "AzureMonitorWindowsAgent" -Publisher "Microsoft.Azure.Monitor" -ExtensionType "AzureMonitorWindowsAgent" -TypeHandlerVersion "1.0" -Location $location
+
+Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
 
 # PowerShell Script to Run
 $dcscript = @"

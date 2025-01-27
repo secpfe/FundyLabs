@@ -1,7 +1,9 @@
 param (
     [string]$adminPassword,
     [string]$vmName,
-    [string]$resourceGroupName
+    [string]$resourceGroupName,
+    [string]$LDAPUserAccount1,
+    [string]$LDAPUserAccount2
 )
 
 Import-Module Az.Compute
@@ -33,8 +35,8 @@ finally:
         conn.unbind()
 
 AD_SERVER = 'ldap://10.0.0.4'
-AD_USER1 = 'ODOMAIN\\\\LDAPUserAccount1'
-AD_USER2 = 'ODOMAIN\\\\LDAPUserAccount2'
+AD_USER1 = 'ODOMAIN\\\\$LDAPUserAccount1'
+AD_USER2 = 'ODOMAIN\\\\$LDAPUserAccount2'
 AD_PASSWORD = '$adminPassword'
 
 connect_to_ad(AD_SERVER, AD_USER1, AD_PASSWORD)
@@ -57,7 +59,7 @@ su - adm0 -c 'whoami'
 su - adm0 -c 'DISPLAY=:99 xfreerdp --version'
 su - adm0 -c 'DISPLAY=:99 timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:'$adminPassword' /dynamic-resolution /cert:ignore &'
 python3 /tmp/temp_script.py
-sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request
+sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request | head -n 3
 "@
 
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId "RunShellScript" -ScriptString $Command

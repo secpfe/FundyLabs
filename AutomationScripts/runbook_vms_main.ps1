@@ -73,6 +73,7 @@ Write-Output "Initiating Step 1..."
 #    [string]$domainName,
 #    [string]$DCvmName,
 #    [string]$resourceGroupName
+#    [string]$location
 #)
 
 $dcJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_PromoteDC" -ResourceGroupName "Orchestrator" -Parameters @{
@@ -80,6 +81,7 @@ $dcJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount
         domainName     = "odomain.local"
         DCvmName          = $DCvmName
         resourceGroupName = $resourceGroupNameOps
+        location = $location
     }
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 1 runbook started!"
@@ -187,16 +189,27 @@ Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 4 tasks completed
 
 Write-Output "Initiating Step 5..."
 
+
 # param (
 #     [string]$adminPassword,
 #     [string]$vmName,
-#     [string]$resourceGroupName
+#     [string]$resourceGroupName,
+#     [string]$LDAPUserAccount1,
+#     [string]$LDAPUserAccount2
 # )
 $web01Job = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_web01_conf" -ResourceGroupName "Orchestrator"  -Parameters @{
     adminPassword = $adminPassword
     vmName = "web01"
     resourceGroupName = $resourceGroupNameOps
+    LDAPUserAccount1 = $LDAPUserAccount1
+    LDAPUserAccount2 = $LDAPUserAccount2
 }
+# param (
+#     [string]$adminPassword,
+#     [string]$vmName,
+#     [string]$resourceGroupName
+# )
+
 $mservJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_mserv_conf" -ResourceGroupName "Orchestrator"  -Parameters @{
     adminPassword = $adminPassword
     vmName = "mserv"
