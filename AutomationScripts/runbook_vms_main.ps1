@@ -47,18 +47,18 @@ function Wait-ForAutomationJob {
         Write-Output "Job $RunBookName Status: $($job.Status)"
 
         if ($job.Status -eq "Completed") {
-            Write-Output "Job completed successfully!"
+            Write-Output "Job $RunBookName completed successfully!"
             break
         } elseif ($job.Status -eq "Failed") {
-            Write-Output "Job failed. Check logs for details."
+            Write-Output "Job $RunBookName failed. Check logs for details."
             break
         } elseif ($job.Status -eq "Stopped" -or $job.Status -eq "Suspended") {
-            Write-Output "Job was stopped or suspended."
+            Write-Output "Job $RunBookName was stopped or suspended."
             break
         }
 
         # Wait for a few seconds before checking again
-        Start-Sleep -Seconds 15
+        Start-Sleep -Seconds 30
     }
 }
 
@@ -142,4 +142,75 @@ Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -ResourceGr
 
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 3 tasks completed successfully!"
+
+#######################################
+# Step 3 ends here
+#######################################
+
+
+########################################################################
+# Step 4.
+# - Configuring DNS on DC
+# - Creating domain objects
+#########################################################################
+Write-Output "Initiating Step 4..."
+
+
+# param (
+#     [string]$DCvmName,
+#     [string]$adminPassword,
+#     [string]$resourceGroupName
+# )
+
+$domainConfigureJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_configureAD" -ResourceGroupName "Orchestrator" -Parameters @{
+    DCvmName = $DCvmName
+    adminPassword = $adminPassword
+    resourceGroupName = $resourceGroupNameOps
+}
+
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -ResourceGroupName "Orchestrator" -JobId $domainConfigureJob.JobId -RunBookName "AD Configuration"
+
+
+Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 4 tasks completed successfully!"
+
+#######################################
+# Step 4 ends here
+#######################################
+
+
+########################################################################
+# Step 5.
+# - Configure web01 and initiate Win10 profile creation
+# - Configuring mserv auditing and downgrading NTLM
+# accessing a file share and starting a service
+#########################################################################
+
+Write-Output "Initiating Step 5..."
+
+# param (
+#     [string]$adminPassword,
+#     [string]$vmName,
+#     [string]$resourceGroupName
+# )
+$web01Job = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_web01_conf" -ResourceGroupName "Orchestrator"  -Parameters @{
+    adminPassword = $adminPassword
+    vmName = "web01"
+    resourceGroupName = $resourceGroupNameOps
+}
+$mservJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_mserv_conf" -ResourceGroupName "Orchestrator"  -Parameters @{
+    adminPassword = $adminPassword
+    vmName = "mserv"
+    resourceGroupName = $resourceGroupNameOps
+}
+
+
+# Wait for All Jobs to Complete
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $web01Job.JobId -ResourceGroupName "Orchestrator" -RunBookName "Web01 Configuration"
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $mservJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "MServ Configuration"
+
+Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 5 completed successfully!"
+
+#######################################
+# Step 5 ends here
+#######################################
 
