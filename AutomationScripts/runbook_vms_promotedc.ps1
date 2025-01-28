@@ -16,7 +16,7 @@ Connect-AzAccount -Identity
 
 Set-AzVMExtension -ResourceGroupName "ITOperations" -VMName "dc" -Name "AzureMonitorWindowsAgent" -Publisher "Microsoft.Azure.Monitor" -ExtensionType "AzureMonitorWindowsAgent" -TypeHandlerVersion "1.0" -Location $location
 
-Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
+Write-Output "Azure Monitor Agent deployed for VM 'DC'." 
 
 # PowerShell Script to Run
 $dcscript = @"

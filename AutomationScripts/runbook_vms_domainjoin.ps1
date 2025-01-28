@@ -40,7 +40,7 @@ Function Invoke-DomainJoinWithRetry {
         [string]$VMName,
         [string]$Script,
         [int]$MaxAttempts = 10,
-        [int]$WaitTime = 120  # Wait time in seconds (2 minutes)
+        [int]$WaitTime = 30  # Wait time in seconds 
     )
 
     $attempt = 1
@@ -59,7 +59,7 @@ Function Invoke-DomainJoinWithRetry {
                 # An error occurred
                 Write-Output "Error occurred: $errorMessage"
                 if ($attempt -lt $MaxAttempts) {
-                    Write-Output "Waiting for 2 minutes before retrying..."
+                    Write-Output "Waiting $WaitTime seconds before retrying..."
                     Start-Sleep -Seconds $WaitTime
                 } else {
                     Write-Output "Maximum attempts reached. Could not join $VMName to the domain."
@@ -73,7 +73,7 @@ Function Invoke-DomainJoinWithRetry {
             # Handle any exceptions from Invoke-AzVMRunCommand
             Write-Output "An error occurred while executing the command: $_"
             if ($attempt -lt $MaxAttempts) {
-                Write-Output "Waiting for 2 minutes before retrying..."
+                Write-Output "Waiting $WaitTime seconds before retrying..."
                 Start-Sleep -Seconds $WaitTime
             } else {
                 Write-Output "Maximum attempts reached. Could not join $VMName to the domain."

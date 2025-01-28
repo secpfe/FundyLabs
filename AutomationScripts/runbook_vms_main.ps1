@@ -227,3 +227,53 @@ Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 5 c
 # Step 5 ends here
 #######################################
 
+
+########################################################################
+# Step 6.
+# - Logging on candice, downloading rs.exe, running rs.exe
+# - Loggin on ssupport
+#########################################################################
+
+Write-Output "Initiating Step 6..."
+
+# param (
+#     [string]$adminPassword,
+#     [string]$resourceGroupName
+# )
+
+$win10Job = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_win10" -ResourceGroupName "Orchestrator"  -Parameters @{
+    adminPassword = $adminPassword
+    resourceGroupName = $resourceGroupNameOps
+}
+
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $win10Job.JobId -ResourceGroupName "Orchestrator" -RunBookName "Win10 Automation"
+
+Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 6 completed successfully!"
+
+#######################################
+# Step 6 ends here
+#######################################
+
+
+########################################################################
+# Step 7.
+# - Secretsdump from mserv using web01
+#########################################################################
+
+Write-Output "Initiating Step 7..."
+
+# param (
+#     [string]$adminPassword,
+#     [string]$vmName,
+#     [string]$resourceGroupName
+# )
+$web01Job = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_web01_lsa" -ResourceGroupName "Orchestrator"  -Parameters @{
+    adminPassword = $adminPassword
+    vmName = "web01"
+    resourceGroupName = $resourceGroupNameOps
+}
+
+# Wait for All Jobs to Complete
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $web01Job.JobId -ResourceGroupName "Orchestrator" -RunBookName "Web01->MSERV LSA Secretsdump attacks"
+
+Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 7 completed successfully!"
