@@ -154,6 +154,7 @@ Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 3 tasks completed
 # Step 4.
 # - Configuring DNS on DC
 # - Creating domain objects
+# - Onboarding to AMA
 #########################################################################
 Write-Output "Initiating Step 4..."
 
@@ -170,7 +171,12 @@ $domainConfigureJob = Start-AzAutomationRunbook -AutomationAccountName "myOrches
     resourceGroupName = $resourceGroupNameOps
 }
 
+$dcAMAJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_onboardDcAMA" -ResourceGroupName "Orchestrator" -Parameters @{
+    location = $location
+}
+
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -ResourceGroupName "Orchestrator" -JobId $domainConfigureJob.JobId -RunBookName "AD Configuration"
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -ResourceGroupName "Orchestrator" -JobId $dcAMAJob.JobId -RunBookName "DC AMA Onboarding"
 
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 4 tasks completed successfully!"
