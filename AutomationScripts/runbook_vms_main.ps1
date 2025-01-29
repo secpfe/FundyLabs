@@ -42,7 +42,7 @@ function Wait-ForAutomationJob {
 
     while ($true) {
         # Retrieve the job status
-        $job = Get-AzAutomationJob -AutomationAccountName $automationAccountName -ResourceGroupName $resourceGroupName -Id $jobId
+        $job = Get-AzAutomationJob -AutomationAccountName $AutomationAccountName -ResourceGroupName $ResourceGroupName -Id $JobId
 
         Write-Output "Job $RunBookName Status: $($job.Status)"
 
@@ -52,9 +52,17 @@ function Wait-ForAutomationJob {
         } elseif ($job.Status -eq "Failed") {
             Write-Output "Job $RunBookName failed. Check logs for details."
             break
-        } elseif ($job.Status -eq "Stopped" -or $job.Status -eq "Suspended") {
-            Write-Output "Job $RunBookName was stopped or suspended."
+        } elseif ($job.Status -eq "Stopped") {
+            Write-Output "Job $RunBookName was stopped."
             break
+        } elseif ($job.Status -eq "Suspended") {
+            Write-Output "Job $RunBookName is suspended. Restarting the job..."
+            
+            # Restarting the job by creating a new one
+            $newJob = Start-AzAutomationRunbook -AutomationAccountName $AutomationAccountName -ResourceGroupName $ResourceGroupName -Name $RunBookName
+            $JobId = $newJob.JobId  
+            
+            Write-Output "New job for $RunBookName started with JobId: $JobId"
         }
 
         # Wait for a few seconds before checking again
