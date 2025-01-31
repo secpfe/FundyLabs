@@ -35,7 +35,9 @@ $paths = @(
     "/?page=hom",
     "/?page=abouts",
     "/?page=service",
-    "/?page=contacts"
+    "/?page=contacts",
+    "/index.php?page=%252e%252e%252fphp.ini",
+    "/index.php?page=%252e%252e%252fsettings.ini"
 )
 
 function Get-RandomUrl {
