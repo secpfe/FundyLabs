@@ -25,18 +25,18 @@ def connect_to_ad(server_address, user, password):
             auto_bind=True
         )
         if conn.bind():
-            print(f\"Successfully connected as {user}\")
+            print(f"Successfully connected as {user}")
         else:
-            print(f\"Failed to bind: {conn.result}\")
+            print(f"Failed to bind: {conn.result}")
     except Exception as e:
-        print(f\"An error occurred: {e}\")
+        print(f"An error occurred: {e}")
     finally:
         if conn:
             conn.unbind()
 
 AD_SERVER = 'ldap://10.0.0.4'
-AD_USER1 = 'ODOMAIN\\\\$LDAPUserAccount1'
-AD_USER2 = 'ODOMAIN\\\\$LDAPUserAccount2'
+AD_USER1 = 'ODOMAIN\\$LDAPUserAccount1'
+AD_USER2 = 'ODOMAIN\\$LDAPUserAccount2'
 AD_PASSWORD = '$adminPassword'
 
 connect_to_ad(AD_SERVER, AD_USER1, AD_PASSWORD)
