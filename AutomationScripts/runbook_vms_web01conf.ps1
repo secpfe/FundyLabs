@@ -15,24 +15,24 @@ $PythonScript = @"
 from ldap3 import Server, Connection, ALL, SIMPLE
 
 def connect_to_ad(server_address, user, password):
-server = Server(server_address, get_info=ALL)
-try:
-    conn = Connection(
-        server,
-        user=user,
-        password=password,
-        authentication=SIMPLE,
-        auto_bind=True
-    )
-    if conn.bind():
-        print(f\"Successfully connected as {user}\")
-    else:
-        print(f\"Failed to bind: {conn.result}\")
-except Exception as e:
-    print(f\"An error occurred: {e}\")
-finally:
-    if conn:
-        conn.unbind()
+    server = Server(server_address, get_info=ALL)
+    try:
+        conn = Connection(
+            server,
+            user=user,
+            password=password,
+            authentication=SIMPLE,
+            auto_bind=True
+        )
+        if conn.bind():
+            print(f\"Successfully connected as {user}\")
+        else:
+            print(f\"Failed to bind: {conn.result}\")
+    except Exception as e:
+        print(f\"An error occurred: {e}\")
+    finally:
+        if conn:
+            conn.unbind()
 
 AD_SERVER = 'ldap://10.0.0.4'
 AD_USER1 = 'ODOMAIN\\\\$LDAPUserAccount1'
@@ -52,7 +52,11 @@ python3 -m pipx ensurepath
 export PATH="`$PATH`:`$HOME/.local/bin"
 python3 -m pipx install impacket
 pip3 install ldap3
-echo "$PythonScript" > /tmp/temp_script.py
+
+cat << 'EOF' > /tmp/temp_script.py
+$PythonScript
+EOF
+
 Xvfb :99 -screen 0 1024x768x16 &
 sleep 30
 su - adm0 -c 'whoami'
