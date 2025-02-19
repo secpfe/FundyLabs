@@ -9,6 +9,9 @@ Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Starting Orchestration
 
 Import-Module Az.Accounts
 Connect-AzAccount -Identity
+$subscription = Get-AzSubscription | Select-Object -First 1
+Set-AzContext -SubscriptionId $subscription.Id
+Write-Output "Using Subscription: $($subscription.Id)"
 
 $DCvmName = "DC"
 $resourceGroupName = "CyberSOC"
