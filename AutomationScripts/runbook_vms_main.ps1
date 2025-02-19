@@ -6,12 +6,13 @@ param (
 )
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Starting Orchestration Runbook..."
-
 Import-Module Az.Accounts
-Connect-AzAccount -Identity
-$subscription = Get-AzSubscription | Select-Object -First 1
-Set-AzContext -SubscriptionId $subscription.Id
-Write-Output "Using Subscription: $($subscription.Id)"
+
+Start-Sleep -Seconds 60
+
+$context = (Connect-AzAccount -Identity).context
+$SubscriptionId = $context.Subscription.Id
+Write-Output "Using Subscription: $SubscriptionId"
 
 $DCvmName = "DC"
 $resourceGroupName = "CyberSOC"
