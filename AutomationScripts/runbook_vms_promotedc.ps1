@@ -24,6 +24,11 @@ Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
 # Import the ADDSDeployment module
 Import-Module ADDSDeployment
 
+Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses ("127.0.0.1")
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters" -Name "DisabledComponents" -PropertyType DWord -Value 0xffffffff
+w32tm /config /manualpeerlist:"time.windows.com,0x1" /syncfromflags:manual /reliable:YES /update
+w32tm /resync
+
 # Define domain configuration
 `$domainName = "$domainName"
 `$safeModePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force 
