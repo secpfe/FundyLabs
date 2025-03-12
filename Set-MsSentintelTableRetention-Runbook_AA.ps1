@@ -4,7 +4,7 @@ $Workspace = "CyberSOCWS"
 $TableNames = @("AzureActivity")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
-
+Start-Sleep -Seconds 120
 $context = (Connect-AzAccount -Identity).context
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
