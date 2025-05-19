@@ -8,11 +8,32 @@ param (
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Starting Orchestration Runbook..."
 Import-Module Az.Accounts
 
-Start-Sleep -Seconds 60
+$maxRetries = 10
+$retryDelay = 30
+$retryCount = 0
+$connected = $false
 
-$context = (Connect-AzAccount -Identity).context
-$SubscriptionId = $context.Subscription.Id
-Write-Output "Using Subscription: $SubscriptionId"
+while (-not $connected -and $retryCount -lt $maxRetries) {
+    try {
+        $context = (Connect-AzAccount -Identity -ErrorAction Stop).Context
+
+        if ($context -and $context.Subscription -and $context.Subscription.Id) {
+            $SubscriptionId = $context.Subscription.Id
+            Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Connected to subscription: $SubscriptionId"
+            $connected = $true
+        } else {
+            throw "Subscription context not ready yet"
+        }
+    } catch {
+        Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Failed to connect. Retrying in $retryDelay seconds... ($($_.Exception.Message))"
+        Start-Sleep -Seconds $retryDelay
+        $retryCount++
+    }
+}
+
+if (-not $connected) {
+    throw "Failed to connect to Azure after $maxRetries attempts. Aborting runbook."
+}
 
 $DCvmName = "DC"
 $resourceGroupName = "CyberSOC"
