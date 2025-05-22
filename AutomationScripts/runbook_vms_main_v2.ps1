@@ -135,11 +135,38 @@ Write-Output "Initiating Step 2..."
 $dcrJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_DCRs" -ResourceGroupName "Orchestrator" 
 $amaJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_AMA" -ResourceGroupName "Orchestrator" 
 $bastionJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_Bastion" -ResourceGroupName "Orchestrator" 
+$domainJoinJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_domainJoin" -ResourceGroupName "Orchestrator" -Parameters @{
+    adminAccount = $adminAccount
+    adminPassword = $adminPassword
+    domainName     = "odomain.local"
+    resourceGroupName = $resourceGroupNameOps
+}
+$domainConfigureJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_configureAD" -ResourceGroupName "Orchestrator" -Parameters @{
+    DCvmName = $DCvmName
+    adminPassword = $adminPassword
+    resourceGroupName = $resourceGroupNameOps
+}
+$dcAMAJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_onboardDcAMA" -ResourceGroupName "Orchestrator" -Parameters @{
+    location = $location
+}
+$web01Job = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_web01_conf" -ResourceGroupName "Orchestrator"  -Parameters @{
+    adminPassword = $adminPassword
+    vmName = "web01"
+    resourceGroupName = $resourceGroupNameOps
+    LDAPUserAccount1 = $LDAPUserAccount1
+    LDAPUserAccount2 = $LDAPUserAccount2
+}
+
+
 
 # Wait for All Jobs to Complete
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $dcrJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "DCRs"
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $amaJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "AMA"
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $bastionJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "Bastion"
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $domainJoinJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "Domain Join"
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $domainConfigureJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "AD Configuration"
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $dcAMAJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "DC AMA Onboarding"
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $web01Job.JobId -ResourceGroupName "Orchestrator" -RunBookName "Web01 Configuration"
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 2 completed successfully!"
 
@@ -154,7 +181,7 @@ Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 2 c
 # Unless machines are successfully joined, the domain is non-operational
 # end the script can't proceed
 #########################################################################
-Write-Output "Initiating Step 3..."
+Write-Output "Skipping Step 3..."
 
 # param (
 #     [string]$adminAccount,
@@ -165,18 +192,10 @@ Write-Output "Initiating Step 3..."
 # )
 
 
-$domainJoinJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_domainJoin" -ResourceGroupName "Orchestrator" -Parameters @{
-    adminAccount = $adminAccount
-    adminPassword = $adminPassword
-    domainName     = "odomain.local"
-    resourceGroupName = $resourceGroupNameOps
-}
 
 
-Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -ResourceGroupName "Orchestrator" -JobId $domainJoinJob.JobId -RunBookName "Domain Join"
 
-
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 3 tasks completed successfully!"
+#Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 3 tasks completed successfully!"
 
 #######################################
 # Step 3 ends here
@@ -189,7 +208,7 @@ Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 3 tasks completed
 # - Creating domain objects
 # - Onboarding to AMA
 #########################################################################
-Write-Output "Initiating Step 4..."
+Write-Output "Skipping Step 4..."
 
 
 # param (
@@ -198,21 +217,8 @@ Write-Output "Initiating Step 4..."
 #     [string]$resourceGroupName
 # )
 
-$domainConfigureJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_configureAD" -ResourceGroupName "Orchestrator" -Parameters @{
-    DCvmName = $DCvmName
-    adminPassword = $adminPassword
-    resourceGroupName = $resourceGroupNameOps
-}
 
-$dcAMAJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_onboardDcAMA" -ResourceGroupName "Orchestrator" -Parameters @{
-    location = $location
-}
-
-Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -ResourceGroupName "Orchestrator" -JobId $domainConfigureJob.JobId -RunBookName "AD Configuration"
-Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -ResourceGroupName "Orchestrator" -JobId $dcAMAJob.JobId -RunBookName "DC AMA Onboarding"
-
-
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 4 tasks completed successfully!"
+#Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 4 tasks completed successfully!"
 
 #######################################
 # Step 4 ends here
@@ -236,13 +242,7 @@ Write-Output "Initiating Step 5..."
 #     [string]$LDAPUserAccount1,
 #     [string]$LDAPUserAccount2
 # )
-$web01Job = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_web01_conf" -ResourceGroupName "Orchestrator"  -Parameters @{
-    adminPassword = $adminPassword
-    vmName = "web01"
-    resourceGroupName = $resourceGroupNameOps
-    LDAPUserAccount1 = $LDAPUserAccount1
-    LDAPUserAccount2 = $LDAPUserAccount2
-}
+
 # param (
 #     [string]$adminPassword,
 #     [string]$vmName,
@@ -257,7 +257,6 @@ $mservJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAcco
 
 
 # Wait for All Jobs to Complete
-Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $web01Job.JobId -ResourceGroupName "Orchestrator" -RunBookName "Web01 Configuration"
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $mservJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "MServ Configuration"
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 5 completed successfully!"
