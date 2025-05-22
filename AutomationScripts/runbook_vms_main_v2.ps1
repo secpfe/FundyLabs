@@ -98,7 +98,7 @@ function Wait-ForAutomationJob {
 #######################################
 # Step 1. Promote a domain controller
 #######################################
-Write-Output "Initiating Step 1..."
+Write-Output "Skipping Step 1..."
 
 
 #param (
@@ -109,15 +109,15 @@ Write-Output "Initiating Step 1..."
 #    [string]$location
 #)
 
-$dcJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_PromoteDC" -ResourceGroupName "Orchestrator" -Parameters @{
-        adminPassword = $adminPassword
-        domainName     = "odomain.local"
-        DCvmName          = $DCvmName
-        resourceGroupName = $resourceGroupNameOps
-        location = $location
-    }
+#$dcJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_PromoteDC" -ResourceGroupName "Orchestrator" -Parameters @{
+#        adminPassword = $adminPassword
+#        domainName     = "odomain.local"
+#        DCvmName          = $DCvmName
+#        resourceGroupName = $resourceGroupNameOps
+#        location = $location
+#    }
 
-Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 1 runbook started!"
+#Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 1 runbook started!"
 
 
 #######################################
