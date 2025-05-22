@@ -149,13 +149,6 @@ $domainConfigureJob = Start-AzAutomationRunbook -AutomationAccountName "myOrches
 $dcAMAJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_onboardDcAMA" -ResourceGroupName "Orchestrator" -Parameters @{
     location = $location
 }
-$web01Job = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_web01_conf" -ResourceGroupName "Orchestrator"  -Parameters @{
-    adminPassword = $adminPassword
-    vmName = "web01"
-    resourceGroupName = $resourceGroupNameOps
-    LDAPUserAccount1 = $LDAPUserAccount1
-    LDAPUserAccount2 = $LDAPUserAccount2
-}
 
 
 
@@ -166,7 +159,7 @@ Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $bas
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $domainJoinJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "Domain Join"
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $domainConfigureJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "AD Configuration"
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $dcAMAJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "DC AMA Onboarding"
-Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $web01Job.JobId -ResourceGroupName "Orchestrator" -RunBookName "Web01 Configuration"
+
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 2 completed successfully!"
 
@@ -242,6 +235,13 @@ Write-Output "Initiating Step 5..."
 #     [string]$LDAPUserAccount1,
 #     [string]$LDAPUserAccount2
 # )
+$web01Job = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_web01_conf" -ResourceGroupName "Orchestrator"  -Parameters @{
+    adminPassword = $adminPassword
+    vmName = "web01"
+    resourceGroupName = $resourceGroupNameOps
+    LDAPUserAccount1 = $LDAPUserAccount1
+    LDAPUserAccount2 = $LDAPUserAccount2
+}
 
 # param (
 #     [string]$adminPassword,
@@ -257,7 +257,9 @@ $mservJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAcco
 
 
 # Wait for All Jobs to Complete
+Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $web01Job.JobId -ResourceGroupName "Orchestrator" -RunBookName "Web01 Configuration"
 Wait-ForAutomationJob -AutomationAccountName "myOrchestratorAccount" -JobId $mservJob.JobId -ResourceGroupName "Orchestrator" -RunBookName "MServ Configuration"
+
 
 Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - All tasks for Step 5 completed successfully!"
 
