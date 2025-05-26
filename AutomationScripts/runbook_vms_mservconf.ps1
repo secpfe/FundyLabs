@@ -43,20 +43,6 @@ Write-Output "Setting Advanced Audit Policies..."
 Set-ItemProperty -Path `$regPath -Name `$regValue -Value 1
 Write-Output "LAN Manager Authentication Level downgraded to NTLMv1 successfully."
 
-`$FileSharePath = "\\10.0.0.4\HealthReports"
-`$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
-`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\reportAdmin", `$securePassword)
-
-# Directly access the file share with the specified credentials
-`$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
-try {
-Get-ChildItem -Path "TempShare:\" 
-} finally {
-Remove-PSDrive -Name TempShare
-}
-
-Write-Output "Accessed a folder under reportAdmin account, with downgraded NTLM."
-
 # Create the service using sc.exe
 `$command = "sc.exe create BackupSVC binPath= c:\backup\backup.exe obj= odomain\da-batch password= $adminPassword start= auto"
 Invoke-Expression `$command
@@ -94,6 +80,21 @@ sc.exe start backupsvc
 
 # Clean up temporary files
 Remove-Item `$SecEditFile -Force
+
+`$FileSharePath = "\\10.0.0.4\HealthReports"
+`$securePassword = ConvertTo-SecureString "$adminPassword" -AsPlainText -Force
+`$Credential = New-Object System.Management.Automation.PSCredential ("odomain\reportAdmin", `$securePassword)
+
+# Directly access the file share with the specified credentials
+`$session = New-PSDrive -Name TempShare -PSProvider FileSystem -Root `$FileSharePath -Credential `$Credential
+try {
+Get-ChildItem -Path "TempShare:\" 
+} finally {
+Remove-PSDrive -Name TempShare
+}
+
+Write-Output "Accessed a folder under reportAdmin account, with downgraded NTLM."
+
 "@
 
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId "RunPowerShellScript" -ScriptString $mservscript
