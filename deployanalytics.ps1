@@ -141,7 +141,7 @@ $analyticsRuleTemplate = @"
                 "description": "",
                 "severity": "Medium",
                 "enabled": true,
-                "query": "let PowerShellEvents = SecurityEvent\n | where SystemUserId!='S-1-5-18' \n  | where EventID == 4104 \n| where EventData has_all (\"Invoke-WebRequest\", \"-OutFile\")\n    | where EventData has_any (\".ps1\", \".exe\", \".msi\", \".bat\", \".vbs\", \".dll\", \".zip\", \".jar\")\n    | project TimeGenerated, Computer, SystemUserId, EventData;\nlet LogonEvents = SecurityEvent\n  | where TimeGenerated>ago(1d) \n  | where EventID == 4624\n    | project Computer, TargetUserSid, TargetUserName;\nPowerShellEvents\n| join kind=leftouter LogonEvents on `$left.SystemUserId == `$right.TargetUserSid \n| distinct TimeGenerated, Computer, Account = TargetUserName, EventData",
+                "query": "let LogonEvents = SecurityEvent\n| where TimeGenerated > ago(1d)\n| where EventID == 4624\n| project Computer, TargetUserSid, TargetUserName;\nlet PowerShellEvents = SecurityEvent\n| where EventID == 4104\n| where SystemUserId != \"S-1-5-18\"\n| where EventData has_all (\"Invoke-WebRequest\", \"-OutFile\")\n| where EventData has_any (\".ps1\", \".exe\", \".msi\", \".bat\", \".vbs\", \".dll\", \".zip\", \".jar\")\n| extend UsernameOnly = case(\n    SystemUserId contains \"/\", tostring(split(SystemUserId, \"/\")[1]),\n    SystemUserId\n)\n| project TimeGenerated, Computer, SystemUserId, UsernameOnly, EventData;\n// SID Join\nlet SIDJoin = PowerShellEvents\n| join kind=leftouter LogonEvents on $left.SystemUserId == $right.TargetUserSid\n| project TimeGenerated, Computer, Account = TargetUserName, EventData, joinType = \"SID\";\n// Username join\nlet UsernameJoin = PowerShellEvents\n| where SystemUserId !startswith \"S-1-\" \n| join kind=leftouter LogonEvents on $left.UsernameOnly == $right.TargetUserName\n| project TimeGenerated, Computer, Account = TargetUserName, EventData, joinType = \"Username\";\n// Union\nSIDJoin\n| union UsernameJoin\n| extend Priority = case(joinType == \"SID\" and isnotempty(Account), 2,\n                         joinType == \"Username\" and isnotempty(Account), 1,\n                         0)\n| summarize arg_max(Priority, Account, joinType) by TimeGenerated, Computer, EventData\n\n",
                 "queryFrequency": "PT5M",
                 "queryPeriod": "PT5M",
                 "triggerOperator": "GreaterThan",
@@ -348,4 +348,5 @@ try {
 catch {
     Write-OutPut "❌ Failed to deploy RemoteRegistry analytics rule: $_" 
 }
+
 
