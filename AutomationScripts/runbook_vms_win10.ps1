@@ -43,6 +43,10 @@ Write-Output "Creating profiles for candice.kevin and ssupport...."
     `@{
         UserName = "ODOMAIN\ssupport"
         ProfilePath = "C:\Users\ssupport"
+    },
+    `@{
+        UserName = "ODOMAIN\reportAdmin"
+        ProfilePath = "C:\Users\reportAdmin"
     }
 )
 
@@ -334,6 +338,38 @@ if (!`$logonOk) {
 
 Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserName."
 Write-Output "`n[+] There should be Event Log for a Type 2 logon for `$UserName."
+
+
+`$UserName    = "odomain\reportAdmin"
+`$Password    = "$adminPassword"
+
+Write-Host "`n[+] Attempting interactive logon for user: `$UserName"
+
+`$domain = ""
+`$user   = `$UserName
+if (`$UserName -like "*\*") {
+    `$domain = `$UserName.Split("\")[0]
+    `$user   = `$UserName.Split("\")[1]
+}
+
+[IntPtr]`$userToken = [IntPtr]::Zero
+`$logonOk = [NativeMethods]::LogonUser(
+    `$user,
+    `$domain,
+    `$Password,
+    [NativeMethods]::LOGON32_LOGON_INTERACTIVE,
+    [NativeMethods]::LOGON32_PROVIDER_DEFAULT,
+    [ref] `$userToken
+)
+
+if (!`$logonOk) {
+    `$err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    throw "LogonUser (interactive) failed. Win32 error: `$err"
+}
+
+Write-Output "[+] LogonUser succeeded. We have an interactive token for `$UserName."
+Write-Output "`n[+] There should be Event Log for a Type 2 logon for `$UserName."
+
 
 "@
 
