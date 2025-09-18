@@ -128,6 +128,28 @@ Add-ADGroupMember -Identity 'Server Operators' -Members `$ReportAccount.SamAccou
 Add-ADGroupMember -Identity 'Remote Desktop Users' -Members `$ReportAccount.SamAccountName 
 Write-Output "User `$(`$ReportAccount.Name) added to group Server Operators"
 
+`$Sid = ([System.Security.Principal.NTAccount]`$ReportAccount.SamAccountName).Translate([System.Security.Principal.SecurityIdentifier]).Value
+`$CfgPath = "`$env:TEMP\secpol_allow.cfg"
+`$DbPath  = "`$env:TEMP\secedit.sdb"
+
+`$cfg = @'
+[Unicode]
+Unicode=yes
+[Version]
+signature="`$CHICAGO`$"
+Revision=1
+[Privilege Rights]
+SeRemoteInteractiveLogonRight = *S-1-5-32-544,*S-ID-PLACEHOLDER
+'@
+
+`$cfg = `$cfg -replace '\*S-ID-PLACEHOLDER',("*`$Sid")
+`$cfg | Set-Content -LiteralPath `$CfgPath -Encoding Unicode
+if (Test-Path `$DbPath) { Remove-Item `$DbPath -Force }
+secedit /configure /db `$DbPath /cfg `$CfgPath /areas USER_RIGHTS | Out-Null
+gpupdate /force | Out-Null
+
+Write-Output "Added SeRemoteInteractiveLogonRight for reportAdmin."
+
 # Create computer accounts in Servers OU
 foreach (`$computer in `$ComputerAccounts) {
     New-ADComputer -Name `$computer -Path "OU=Servers,OU=Corp,`$domainDN" 
@@ -212,3 +234,4 @@ $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $D
 # View the full output of provisioning
 
 $output.Value | ForEach-Object { $_.Message }
+
