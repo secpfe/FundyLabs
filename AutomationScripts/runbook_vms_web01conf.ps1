@@ -50,7 +50,7 @@ sudo apt-get install -y python3-pip python3-venv freerdp2-x11 xvfb
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
 export PATH="`$PATH`:`$HOME/.local/bin"
-python3 -m pipx install impacket
+python3 -m pipx install "impacket==0.9.22"
 pip3 install ldap3
 
 cat << 'EOF' > /tmp/temp_script.py
@@ -72,4 +72,5 @@ set +H
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId "RunShellScript" -ScriptString $Command
 # View the full output
 $output.Value | ForEach-Object { $_.Message }
+
 
