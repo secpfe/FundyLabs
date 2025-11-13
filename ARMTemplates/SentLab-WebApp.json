@@ -105,28 +105,6 @@
           "branch": "main",
           "isManualIntegration": true
         }
-      },
-      {
-        "type": "Microsoft.Web/sites/providers/diagnosticSettings",
-        "apiVersion": "2017-05-01-preview",
-        "name": "[concat(variables('uniqueName'), '/Microsoft.Insights/', 'diagnosticSettingWebApp')]",
-        "dependsOn": [
-          "[resourceId('Microsoft.Web/sites', variables('uniqueName'))]"
-        ],
-        "properties": {
-          "workspaceId": "[resourceId('CyberSOC', 'Microsoft.OperationalInsights/workspaces', 'CyberSOCWS')]",
-          "logs": [
-            {
-              "category": "AppServiceHTTPLogs",
-              "enabled": true,
-              "retentionPolicy": {
-                "enabled": false,
-                "days": 0
-              }
-            }
-          ],
-          "metrics": []
-        }
       }
   ]
 } 
