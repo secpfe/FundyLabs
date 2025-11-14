@@ -18,6 +18,7 @@ Write-Output "Looking for workspace '$workspaceName' in resource group '$Resourc
 try {
     $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup -Name $workspaceName -ErrorAction Stop
     $Workspace = $workspace.Name
+    $location = $workspace.Location  # Save location immediately after getting workspace
     Write-Output "Found workspace: $Workspace"
 } catch {
     # Workspace with provided name not found, discover dynamically
@@ -27,6 +28,7 @@ try {
         throw "No Log Analytics workspace found in resource group $ResourceGroup"
     }
     $Workspace = $workspace.Name
+    $location = $workspace.Location  # Save location immediately after getting workspace
     Write-Output "Discovered workspace: $Workspace"
 }
 
@@ -53,9 +55,8 @@ if (!$resourceGroup) {
 # Ensure $ResourceGroup stays as string
 $ResourceGroup = $resourceGroupName
 
-# Get location from workspace (not resource group) - workspace location is the one needed
-Write-Output "Getting workspace location..."
-$location = $workspace.Location
+# Location already saved above from workspace object
+# If location is still not set, try resource group as fallback
 if (!$location) {
     Write-Output "Warning: Workspace location not found, trying resource group location..."
     $location = $resourceGroup.Location
@@ -177,8 +178,8 @@ foreach ($TableName in $TableNames) {
         Write-Output "TotalRetentionInDays: $($webData.properties.totalRetentionInDays)"
         
         $table = [PSCustomObject]@{
-            WorkspaceName = $webdata.name
-            RetentionInDays = $webdata.properties.retentionInDays
+            WorkspaceName = $webData.name
+            RetentionInDays = $webData.properties.retentionInDays
             ArchiveRetentionInDays = $webData.properties.archiveRetentionInDays
             TotalRetentionInDays = $webData.properties.totalRetentionInDays
         }
@@ -227,10 +228,10 @@ catch {
 
 try {
     $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-            $webapp = [PSCustomObject]@{
-                WebAppName = $webdata.name
-                WebAppNameStartupcommand = $webdata.properties.appCommandLine
-        }
+    $webapp = [PSCustomObject]@{
+        WebAppName = $webData.name
+        WebAppNameStartupcommand = $webData.properties.appCommandLine
+    }
 }
 catch {
     Write-Output "Unable to list the webapp properties with error code: $($_.Exception.Message)"
