@@ -71,40 +71,29 @@ $argHash = @{
 }
 
 try {
-    Write-Output "Updating workspace retention..."
-    Write-Output "Workspace URI: $baseUri"
+    Write-Output "Updating workspace retention to $RetentionInDays days..."
     $updateBody = $argHash | ConvertTo-Json -EnumsAsStrings -Depth 50
-        Write-Output "Request body: $updateBody"
-        Write-Output "Sending PUT request..."
-        $result = Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body $updateBody
-        Write-Output "PUT request completed"
-        Write-Output "Response received. Workspace updated successfully"
-        if ($result) {
-            Write-Output "Response details: $($result | ConvertTo-Json -Depth 3)"
-        }
-    }
-    catch {
-        Write-Output "ERROR: Failed to update workspace"
-        Write-Output "Error Message: $($_.Exception.Message)"
-        if ($_.Exception.Response) {
-            Write-Output "HTTP Status Code: $($_.Exception.Response.StatusCode.value__)"
-        }
-        Write-Error "Unable to update the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
-    }
+    Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body $updateBody
+    Write-Output "Workspace retention updated successfully"
+}
+catch {
+    Write-Output "ERROR: Failed to update workspace - $($_.Exception.Message)"
+    Write-Error "Unable to update the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
+}
 
-    try {
-        $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-        # Preserve Workspace name as string
-        $Workspace = $webData.name
-        $workspaceResult = [PSCustomObject]@{
-            WorkspaceName = $webData.name
-            RetentionInDays = $webData.properties.retentionInDays
-        }
+try {
+    $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
+    # Preserve Workspace name as string
+    $Workspace = $webData.name
+    $workspaceResult = [PSCustomObject]@{
+        WorkspaceName = $webData.name
+        RetentionInDays = $webData.properties.retentionInDays
     }
-    catch {
-        Write-Output "Unable to list the workspace properties with error code: $($_.Exception.Message)" 
-        Write-Error "Unable to list the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
-    }
+}
+catch {
+    Write-Output "ERROR: Failed to retrieve workspace properties - $($_.Exception.Message)"
+    Write-Error "Unable to list the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
+}
 
 Write-Output $workspaceResult
 
@@ -115,11 +104,7 @@ $RetentionInDays = 90
 $TotalRetentionInDays = 120
 
 Write-Output "=== Starting table retention updates ==="
-Write-Output "ResourceGroup: $ResourceGroup"
-Write-Output "Workspace: $Workspace"
-Write-Output "SubscriptionId: $SubscriptionId"
-Write-Output "Location: $location"
-Write-Output "Tables to update: $($TableNames -join ', ')"
+Write-Output "Updating tables: $($TableNames -join ', ') with RetentionInDays: $RetentionInDays, TotalRetentionInDays: $TotalRetentionInDays"
 
 $argHash = @{}
 $argHash.properties = @{
@@ -127,56 +112,25 @@ $argHash.properties = @{
     totalRetentionInDays  = "$TotalRetentionInDays"
 }
 
-Write-Output "Table retention settings - RetentionInDays: $RetentionInDays, TotalRetentionInDays: $TotalRetentionInDays"
-Write-Output "Request body: $($argHash | ConvertTo-Json -EnumsAsStrings -Depth 50)"
-
 $tables = [System.Collections.Generic.List[PSObject]]::new()
 
 foreach ($TableName in $TableNames) {
-    Write-Output "--- Processing table: $TableName ---"
+    Write-Output "Updating table: $TableName..."
     $serverUrl = "https://management.azure.com"
     $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}/Tables/${TableName}/?api-version=2023-09-01"
-    
-    Write-Output "Table URI: $baseUri"
-    Write-Output "Attempting to update table: $TableName"
 
     try {
         $updateBody = $argHash | ConvertTo-Json -EnumsAsStrings -Depth 50
-        Write-Output "PUT request body: $updateBody"
-        Write-Output "Sending PUT request to update table..."
-        $result = Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body $updateBody
-        Write-Output "Successfully sent PUT request for table: $TableName"
-        Write-Output "PUT response: $($result | ConvertTo-Json -Depth 5)"
-        }
+        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body $updateBody
+        Write-Output "Table $TableName updated successfully"
+    }
     catch {
-        $errorDetails = $_.Exception.Message
-        Write-Output "ERROR: Failed to update table '$TableName'"
-        Write-Output "Error Message: $errorDetails"
-        if ($_.Exception.Response) {
-            Write-Output "HTTP Status Code: $($_.Exception.Response.StatusCode.value__)"
-            try {
-                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-                $responseBody = $reader.ReadToEnd()
-                Write-Output "Response Body: $responseBody"
-            } catch {
-                Write-Output "Could not read response body"
-            }
-        }
-        if ($_.ErrorDetails.Message) {
-            Write-Output "Error Details: $($_.ErrorDetails.Message)"
-        }
-        Write-Error "Unable to update the table '$TableName' with error code: $errorDetails" -ErrorAction Stop
+        Write-Output "ERROR: Failed to update table '$TableName' - $($_.Exception.Message)"
+        Write-Error "Unable to update the table '$TableName' with error code: $($_.Exception.Message)" -ErrorAction Stop
     }
 
-    Write-Output "Attempting to retrieve updated table information: $TableName"
     try {
-        Write-Output "Sending GET request to retrieve table details..."
         $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-        Write-Output "Successfully retrieved table information for: $TableName"
-        Write-Output "Table Name: $($webData.name)"
-        Write-Output "RetentionInDays: $($webData.properties.retentionInDays)"
-        Write-Output "TotalRetentionInDays: $($webData.properties.totalRetentionInDays)"
-        
         $table = [PSCustomObject]@{
             WorkspaceName = $webData.name
             RetentionInDays = $webData.properties.retentionInDays
@@ -184,30 +138,27 @@ foreach ($TableName in $TableNames) {
             TotalRetentionInDays = $webData.properties.totalRetentionInDays
         }
         $tables.Add($table)
-        Write-Output "Successfully processed table: $TableName"
     }
     catch {
-        $errorDetails = $_.Exception.Message
-        Write-Output "ERROR: Failed to retrieve table '$TableName' information"
-        Write-Output "Error Message: $errorDetails"
-        if ($_.Exception.Response) {
-            Write-Output "HTTP Status Code: $($_.Exception.Response.StatusCode.value__)"
-        }
-        Write-Error "Unable to list the table '$TableName' with error code: $errorDetails" -ErrorAction Stop
+        Write-Output "ERROR: Failed to retrieve table '$TableName' information - $($_.Exception.Message)"
+        Write-Error "Unable to list the table '$TableName' with error code: $($_.Exception.Message)" -ErrorAction Stop
     }
-
-    Write-Output "--- Finished processing table: $TableName ---"
 }
 
 Write-Output $tables
 
 
 #SETTINGS
+Write-Output "=== Starting webApp configuration update ==="
 $ResourceGroup = "ITOperations"
 $Command = "mv /home/site/wwwroot/config.ini /home/site/"
+
+Write-Output "Waiting 120 seconds before webApp update..."
 Start-Sleep -Seconds 120
 
+Write-Output "Getting webApp from resource group: $ResourceGroup"
 $WebAppName = (Get-AzWebApp -ResourceGroupName $ResourceGroup).Name
+Write-Output "Found webApp: $WebAppName"
 
 $serverUrl = "https://management.azure.com"
 $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.Web/sites/${WebAppName}/config/web?api-version=2024-04-01"
@@ -218,23 +169,28 @@ $appsetting = @{
     }
 }
 
+Write-Output "Updating webApp startup command..."
 try {
     Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($appsetting  | ConvertTo-Json -EnumsAsStrings -Depth 50)
-    }
+    Write-Output "WebApp startup command updated successfully"
+}
 catch {
-    Write-Output "Unable to update the webapp with error code: $($_.Exception.Message)" 
+    Write-Output "ERROR: Failed to update webApp - $($_.Exception.Message)"
     Write-Error "Unable to update the webapp with error code: $($_.Exception.Message)" -ErrorAction Stop
 }
 
+Write-Output "Retrieving updated webApp configuration..."
 try {
     $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
     $webapp = [PSCustomObject]@{
         WebAppName = $webData.name
         WebAppNameStartupcommand = $webData.properties.appCommandLine
     }
+    Write-Output "WebApp configuration retrieved successfully"
+    Write-Output "WebApp: $($webapp.WebAppName), Startup Command: $($webapp.WebAppNameStartupcommand)"
 }
 catch {
-    Write-Output "Unable to list the webapp properties with error code: $($_.Exception.Message)"
+    Write-Output "ERROR: Failed to retrieve webApp properties - $($_.Exception.Message)"
     Write-Error "Unable to list the webapp properties with error code: $($_.Exception.Message)" -ErrorAction Stop
 }
 
