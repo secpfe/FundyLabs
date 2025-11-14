@@ -305,10 +305,9 @@ try {
     
     Write-Output "Getting access token for incident creation..."
     $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
-    $tokenString = $token.Token | ConvertFrom-SecureString -AsPlainText
     $authHeader = @{
         'Content-Type'  = 'application/json'
-        'Authorization' = "Bearer $tokenString"
+        'Authorization' = 'Bearer ' + $token.Token
     }
     Write-Output "Access token obtained"
     
