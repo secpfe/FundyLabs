@@ -32,17 +32,13 @@ $serverUrl = "https://management.azure.com"
 $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}?api-version=2023-09-01"
 
 # Get the resource group location
-# Save ResourceGroup name as string before getting resource group object
-$ResourceGroupName = $ResourceGroup
-$resourceGroupObj = Get-AzResourceGroup -Name $ResourceGroupName
-if (!$resourceGroupObj) {
-        Write-Output "Resource group '$ResourceGroupName' not found." -ForegroundColor Red
+$resourceGroup = Get-AzResourceGroup -Name $ResourceGroup
+if (!$resourceGroup) {
+    Write-Output "Resource group '$resourceGroupName' not found." -ForegroundColor Red
     exit
 }
 
-# Ensure $ResourceGroup stays as string (not object)
-$ResourceGroup = $ResourceGroupName
-$location = $resourceGroupObj.Location
+$location = $resourceGroup.Location
 
     $argHash = @{
         location = $location 
@@ -52,7 +48,7 @@ $location = $resourceGroupObj.Location
     }
 
     try {
-        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
     }
     catch {
         Write-Error "Unable to update the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
@@ -60,12 +56,10 @@ $location = $resourceGroupObj.Location
 
     try {
         $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-        # Preserve workspace name as string before overwriting $workspace variable
-        $Workspace = $webData.name
-        $workspace = [PSCustomObject]@{
-            WorkspaceName = $webData.name
-            RetentionInDays = $webData.properties.retentionInDays
-        }
+                $workspace = [PSCustomObject]@{
+                    WorkspaceName = $webdata.name
+                    RetentionInDays = $webdata.properties.retentionInDays
+            }
     }
     catch {
         Write-Output "Unable to list the workspace properties with error code: $($_.Exception.Message)" 
@@ -80,42 +74,20 @@ $TableNames = @("AzureActivity","SecurityEvent")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
 
-# Ensure $Workspace contains string (not object) - use workspaceName parameter if needed
-if ([string]::IsNullOrEmpty($Workspace) -or $Workspace -isnot [string]) {
-    if ($workspaceName) {
-        $Workspace = $workspaceName
-        Write-Output "Using workspaceName parameter for tables: $Workspace"
-    } else {
-        $workspaceObj = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup | Select-Object -First 1
-        if ($workspaceObj) {
-            $Workspace = $workspaceObj.Name
-            Write-Output "Recovered workspace name: $Workspace"
-        } else {
-            throw "Cannot determine workspace name"
-        }
-    }
+$argHash = @{}
+$argHash.properties = @{
+    retentionInDays         = "$RetentionInDays"
+    totalRetentionInDays  = "$TotalRetentionInDays"
 }
-
-Write-Output "Updating tables in workspace: $Workspace"
 
 $tables = [System.Collections.Generic.List[PSObject]]::new()
 
 foreach ($TableName in $TableNames) {
     $serverUrl = "https://management.azure.com"
-    # Use same API version as workspace update
-    $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}/Tables/${TableName}?api-version=2023-09-01"
-    Write-Output "Updating table: $TableName with URI: $baseUri"
-
-    $argHash = @{
-        location = $location
-        properties = @{
-            retentionInDays         = $RetentionInDays
-            totalRetentionInDays    = $TotalRetentionInDays
-        }
-    }
+    $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}/Tables/${TableName}/?api-version=2023-09-01"
 
     try {
-        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
         }
     catch {
         Write-Error "Unable to update the table with error code: $($_.Exception.Message)" -ErrorAction Stop
@@ -123,13 +95,13 @@ foreach ($TableName in $TableNames) {
 
     try {
         $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-        $table = [PSCustomObject]@{
-            WorkspaceName = $webData.name
-            RetentionInDays = $webData.properties.retentionInDays
-            ArchiveRetentionInDays = $webData.properties.archiveRetentionInDays
-            TotalRetentionInDays = $webData.properties.totalRetentionInDays
-        }
-        $tables.Add($table)
+                $table = [PSCustomObject]@{
+                    WorkspaceName = $webdata.name
+                    RetentionInDays = $webdata.properties.retentionInDays
+                    ArchiveRetentionInDays = $webData.properties.archiveRetentionInDays
+                    TotalRetentionInDays = $webData.properties.totalRetentionInDays
+            }
+            $tables.Add($table)
     }
     catch {
         Write-Error "Unable to list the table with error code: $($_.Exception.Message)" -ErrorAction Stop
@@ -158,7 +130,7 @@ $appsetting = @{
 }
 
 try {
-    Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($appsetting  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+    Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($appsetting  | ConvertTo-Json -EnumsAsStrings -Depth 50)
     }
 catch {
     Write-Output "Unable to update the webapp with error code: $($_.Exception.Message)" 
@@ -167,10 +139,10 @@ catch {
 
 try {
     $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-    $webapp = [PSCustomObject]@{
-        WebAppName = $webData.name
-        WebAppNameStartupcommand = $webData.properties.appCommandLine
-    }
+            $webapp = [PSCustomObject]@{
+                WebAppName = $webdata.name
+                WebAppNameStartupcommand = $webdata.properties.appCommandLine
+        }
 }
 catch {
     Write-Output "Unable to list the webapp properties with error code: $($_.Exception.Message)"
@@ -178,5 +150,3 @@ catch {
 }
 
 return $webapp
-
-
