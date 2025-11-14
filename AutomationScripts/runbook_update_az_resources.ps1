@@ -52,19 +52,27 @@ if (!$resourceGroup) {
 
 # Ensure $ResourceGroup stays as string
 $ResourceGroup = $resourceGroupName
-$location = $resourceGroup.Location
 
-    $argHash = @{
-        location = $location 
-        properties = @{
-            retentionInDays = $RetentionInDays
-        }
+# Get location from workspace (not resource group) - workspace location is the one needed
+Write-Output "Getting workspace location..."
+$location = $workspace.Location
+if (!$location) {
+    Write-Output "Warning: Workspace location not found, trying resource group location..."
+    $location = $resourceGroup.Location
+}
+Write-Output "Using location: $location"
+
+$argHash = @{
+    location = $location 
+    properties = @{
+        retentionInDays = $RetentionInDays
     }
+}
 
-    try {
-        Write-Output "Updating workspace retention..."
-        Write-Output "Workspace URI: $baseUri"
-        $updateBody = $argHash | ConvertTo-Json -EnumsAsStrings -Depth 50
+try {
+    Write-Output "Updating workspace retention..."
+    Write-Output "Workspace URI: $baseUri"
+    $updateBody = $argHash | ConvertTo-Json -EnumsAsStrings -Depth 50
         Write-Output "Request body: $updateBody"
         Write-Output "Sending PUT request..."
         $result = Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body $updateBody
