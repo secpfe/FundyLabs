@@ -2,15 +2,23 @@ param (
     [string]$workspaceName = "CyberSOCWS"
 )
 
+Write-Output "=== Script started ==="
+Write-Output "Parameter workspaceName: $workspaceName"
+
 #SETTINGS
 $ResourceGroup = "CyberSOC"
 $RetentionInDays = 60
 
+Write-Output "Connecting to Azure..."
 $context = (Connect-AzAccount -Identity).context
+Write-Output "Connected successfully. Subscription: $($context.Subscription.Id)"
+
+Write-Output "Looking for workspace '$workspaceName' in resource group '$ResourceGroup'..."
 # Try to get workspace with provided/default name, fallback to discovery if not found
 try {
     $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup -Name $workspaceName -ErrorAction Stop
     $Workspace = $workspace.Name
+    Write-Output "Found workspace: $Workspace"
 } catch {
     # Workspace with provided name not found, discover dynamically
     Write-Output "Workspace '$workspaceName' not found, discovering workspace from resource group..."
@@ -21,11 +29,14 @@ try {
     $Workspace = $workspace.Name
     Write-Output "Discovered workspace: $Workspace"
 }
+
+Write-Output "Getting access token..."
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
     'Content-Type'  = 'application/json'
     'Authorization' = 'Bearer ' + $token.Token
 }
+Write-Output "Access token obtained"
 
 $SubscriptionId = $context.Subscription.Id
 $serverUrl = "https://management.azure.com"
@@ -51,7 +62,9 @@ $location = $resourceGroup.Location
     }
 
     try {
-        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+        Write-Output "Updating workspace retention..."
+        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+        Write-Output "Workspace updated successfully"
     }
     catch {
         Write-Error "Unable to update the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
@@ -109,7 +122,7 @@ foreach ($TableName in $TableNames) {
         $updateBody = $argHash | ConvertTo-Json -EnumsAsStrings -Depth 50
         Write-Output "PUT request body: $updateBody"
         Write-Output "Sending PUT request to update table..."
-        $result = Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body $updateBody
+        $result = Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body $updateBody
         Write-Output "Successfully sent PUT request for table: $TableName"
         Write-Output "PUT response: $($result | ConvertTo-Json -Depth 5)"
         }
@@ -184,7 +197,7 @@ $appsetting = @{
 }
 
 try {
-    Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($appsetting  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+    Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($appsetting  | ConvertTo-Json -EnumsAsStrings -Depth 50)
     }
 catch {
     Write-Output "Unable to update the webapp with error code: $($_.Exception.Message)" 
