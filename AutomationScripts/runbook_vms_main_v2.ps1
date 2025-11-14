@@ -144,7 +144,9 @@ Write-Output "Skipping Step 1..."
 #######################################################
 Write-Output "Initiating Step 2..."
 
-$dcrJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_DCRs" -ResourceGroupName "Orchestrator" 
+$dcrJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_DCRs" -ResourceGroupName "Orchestrator" -Parameters @{
+    workspaceName = $workspaceName  # Pass the workspace name
+}
 $amaJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_AMA" -ResourceGroupName "Orchestrator" 
 $bastionJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_Bastion" -ResourceGroupName "Orchestrator" 
 $domainJoinJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_domainJoin" -ResourceGroupName "Orchestrator" -Parameters @{

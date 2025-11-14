@@ -144,7 +144,9 @@ Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Step 1 runbook started
 #######################################################
 Write-Output "Initiating Step 2..."
 
-$dcrJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_DCRs" -ResourceGroupName "Orchestrator" 
+$dcrJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_DCRs" -ResourceGroupName "Orchestrator" -Parameters @{
+    workspaceName = $workspaceName  # Pass the workspace name
+}
 $amaJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_AMA" -ResourceGroupName "Orchestrator" 
 $bastionJob = Start-AzAutomationRunbook -AutomationAccountName "myOrchestratorAccount" -Name "VMs_Bastion" -ResourceGroupName "Orchestrator" 
 
