@@ -16,19 +16,19 @@ Write-Output "Connected successfully. Subscription: $($context.Subscription.Id)"
 Write-Output "Looking for workspace '$workspaceName' in resource group '$ResourceGroup'..."
 # Try to get workspace with provided/default name, fallback to discovery if not found
 try {
-    $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup -Name $workspaceName -ErrorAction Stop
-    $Workspace = $workspace.Name
-    $location = $workspace.Location  # Save location immediately after getting workspace
+    $workspaceObj = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup -Name $workspaceName -ErrorAction Stop
+    $Workspace = $workspaceObj.Name
+    $location = $workspaceObj.Location  # Save location from workspace object
     Write-Output "Found workspace: $Workspace"
 } catch {
     # Workspace with provided name not found, discover dynamically
     Write-Output "Workspace '$workspaceName' not found, discovering workspace from resource group..."
-    $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup | Select-Object -First 1
-    if (-not $workspace) {
+    $workspaceObj = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup | Select-Object -First 1
+    if (-not $workspaceObj) {
         throw "No Log Analytics workspace found in resource group $ResourceGroup"
     }
-    $Workspace = $workspace.Name
-    $location = $workspace.Location  # Save location immediately after getting workspace
+    $Workspace = $workspaceObj.Name
+    $location = $workspaceObj.Location  # Save location from workspace object
     Write-Output "Discovered workspace: $Workspace"
 }
 
@@ -46,8 +46,8 @@ $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${Resou
 
 # Get the resource group location
 $resourceGroupName = $ResourceGroup  # Save as string first
-$resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
-if (!$resourceGroup) {
+$resourceGroupObj = Get-AzResourceGroup -Name $resourceGroupName
+if (!$resourceGroupObj) {
     Write-Output "Resource group '$resourceGroupName' not found." -ForegroundColor Red
     exit
 }
@@ -59,7 +59,7 @@ $ResourceGroup = $resourceGroupName
 # If location is still not set, try resource group as fallback
 if (!$location) {
     Write-Output "Warning: Workspace location not found, trying resource group location..."
-    $location = $resourceGroup.Location
+    $location = $resourceGroupObj.Location
 }
 Write-Output "Using location: $location"
 
@@ -94,9 +94,9 @@ try {
 
     try {
         $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-        # Preserve Workspace name as string before overwriting workspace variable
+        # Preserve Workspace name as string
         $Workspace = $webData.name
-        $workspace = [PSCustomObject]@{
+        $workspaceResult = [PSCustomObject]@{
             WorkspaceName = $webData.name
             RetentionInDays = $webData.properties.retentionInDays
         }
@@ -106,7 +106,7 @@ try {
         Write-Error "Unable to list the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
     }
 
-Write-Output $workspace
+Write-Output $workspaceResult
 
 #SETTINGS
 # $ResourceGroup and $Workspace already set above
