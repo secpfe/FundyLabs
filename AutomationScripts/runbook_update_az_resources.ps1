@@ -63,10 +63,23 @@ $location = $resourceGroup.Location
 
     try {
         Write-Output "Updating workspace retention..."
-        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
-        Write-Output "Workspace updated successfully"
+        Write-Output "Workspace URI: $baseUri"
+        $updateBody = $argHash | ConvertTo-Json -EnumsAsStrings -Depth 50
+        Write-Output "Request body: $updateBody"
+        Write-Output "Sending PUT request..."
+        $result = Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body $updateBody
+        Write-Output "PUT request completed"
+        Write-Output "Response received. Workspace updated successfully"
+        if ($result) {
+            Write-Output "Response details: $($result | ConvertTo-Json -Depth 3)"
+        }
     }
     catch {
+        Write-Output "ERROR: Failed to update workspace"
+        Write-Output "Error Message: $($_.Exception.Message)"
+        if ($_.Exception.Response) {
+            Write-Output "HTTP Status Code: $($_.Exception.Response.StatusCode.value__)"
+        }
         Write-Error "Unable to update the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
     }
 
