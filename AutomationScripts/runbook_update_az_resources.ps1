@@ -74,11 +74,20 @@ $TableNames = @("AzureActivity","SecurityEvent")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
 
+# Ensure $Workspace is set - use workspaceName parameter if available, otherwise use discovered value
+if (-not $Workspace -and $workspaceName) {
+    $Workspace = $workspaceName
+    Write-Output "Using workspaceName parameter for tables: $Workspace"
+}
+
+Write-Output "Updating tables in workspace: $Workspace"
+
 $tables = [System.Collections.Generic.List[PSObject]]::new()
 
 foreach ($TableName in $TableNames) {
     $serverUrl = "https://management.azure.com"
     $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}/Tables/${TableName}?api-version=2023-09-01"
+    Write-Output "Updating table: $TableName with URI: $baseUri"
 
     $argHash = @{
         location = $location

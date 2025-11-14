@@ -91,7 +91,7 @@
         {
             "name": "[parameters('workspaceName')]",
             "type": "Microsoft.OperationalInsights/workspaces",
-            "apiVersion": "2015-11-01-preview",
+            "apiVersion": "2021-06-01",
             "location": "[parameters('location')]",
             "properties": {
                 "retentionInDays": "[parameters('dataRetention')]",
@@ -115,27 +115,6 @@
             "dependsOn": [
                 "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaceName'))]"
             ]
-        },
-        {
-            "name": "[concat('SecurityInsights','(', parameters('workspaceName'),')')]",
-            "type": "Microsoft.OperationsManagement/solutions",
-            "apiVersion": "2015-11-01-preview",
-            "location": "[resourceGroup().location]",
-            "dependsOn": [
-                "default"
-            ],
-            "properties": {
-                "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaceName'))]",
-                "sku": {
-                    "name": "Unified"
-                }
-            },
-            "plan": {
-                "name": "[concat('SecurityInsights','(', parameters('workspaceName'),')')]",
-                "product": "OMSGallery/SecurityInsights",
-                "publisher": "Microsoft",
-                "promotionCode": ""
-            }
         },
         {
             "type": "Microsoft.SecurityInsights/incidents",
