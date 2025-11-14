@@ -86,6 +86,7 @@ $tables = [System.Collections.Generic.List[PSObject]]::new()
 
 foreach ($TableName in $TableNames) {
     $serverUrl = "https://management.azure.com"
+    # Use same API version as workspace update
     $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}/Tables/${TableName}?api-version=2023-09-01"
     Write-Output "Updating table: $TableName with URI: $baseUri"
 
