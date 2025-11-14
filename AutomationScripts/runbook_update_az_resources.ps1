@@ -4,6 +4,9 @@ param (
 
 #SETTINGS
 $ResourceGroup = "CyberSOC"
+$RetentionInDays = 60
+
+$context = (Connect-AzAccount -Identity).context
 # Try to get workspace with provided/default name, fallback to discovery if not found
 try {
     $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup -Name $workspaceName -ErrorAction Stop
@@ -18,9 +21,6 @@ try {
     $Workspace = $workspace.Name
     Write-Output "Discovered workspace: $Workspace"
 }
-$RetentionInDays = 60
-
-$context = (Connect-AzAccount -Identity).context
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
     'Content-Type'  = 'application/json'

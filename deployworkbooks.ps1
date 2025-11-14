@@ -1,13 +1,13 @@
 #SETTINGS
 $ResourceGroup = "CyberSOC"
+Start-Sleep -Seconds 120
+$context = (Connect-AzAccount -Identity).context
 # Discover workspace from resource group
 $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup | Select-Object -First 1
 if (-not $workspace) {
     throw "No Log Analytics workspace found in resource group $ResourceGroup"
 }
 $Workspace = $workspace.Name
-Start-Sleep -Seconds 120
-$context = (Connect-AzAccount -Identity).context
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
     'Content-Type'  = 'application/json'
