@@ -74,40 +74,89 @@ $TableNames = @("AzureActivity","SecurityEvent")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
 
+Write-Output "=== Starting table retention updates ==="
+Write-Output "ResourceGroup: $ResourceGroup"
+Write-Output "Workspace: $Workspace"
+Write-Output "SubscriptionId: $SubscriptionId"
+Write-Output "Location: $location"
+Write-Output "Tables to update: $($TableNames -join ', ')"
+
 $argHash = @{}
 $argHash.properties = @{
     retentionInDays         = "$RetentionInDays"
     totalRetentionInDays  = "$TotalRetentionInDays"
 }
 
+Write-Output "Table retention settings - RetentionInDays: $RetentionInDays, TotalRetentionInDays: $TotalRetentionInDays"
+Write-Output "Request body: $($argHash | ConvertTo-Json -EnumsAsStrings -Depth 50)"
+
 $tables = [System.Collections.Generic.List[PSObject]]::new()
 
 foreach ($TableName in $TableNames) {
+    Write-Output "--- Processing table: $TableName ---"
     $serverUrl = "https://management.azure.com"
     $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}/Tables/${TableName}/?api-version=2023-09-01"
+    
+    Write-Output "Table URI: $baseUri"
+    Write-Output "Attempting to update table: $TableName"
 
     try {
-        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+        $updateBody = $argHash | ConvertTo-Json -EnumsAsStrings -Depth 50
+        Write-Output "PUT request body: $updateBody"
+        Write-Output "Sending PUT request to update table..."
+        $result = Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body $updateBody
+        Write-Output "Successfully sent PUT request for table: $TableName"
+        Write-Output "PUT response: $($result | ConvertTo-Json -Depth 5)"
         }
     catch {
-        Write-Error "Unable to update the table with error code: $($_.Exception.Message)" -ErrorAction Stop
+        $errorDetails = $_.Exception.Message
+        Write-Output "ERROR: Failed to update table '$TableName'"
+        Write-Output "Error Message: $errorDetails"
+        if ($_.Exception.Response) {
+            Write-Output "HTTP Status Code: $($_.Exception.Response.StatusCode.value__)"
+            try {
+                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $responseBody = $reader.ReadToEnd()
+                Write-Output "Response Body: $responseBody"
+            } catch {
+                Write-Output "Could not read response body"
+            }
+        }
+        if ($_.ErrorDetails.Message) {
+            Write-Output "Error Details: $($_.ErrorDetails.Message)"
+        }
+        Write-Error "Unable to update the table '$TableName' with error code: $errorDetails" -ErrorAction Stop
     }
 
+    Write-Output "Attempting to retrieve updated table information: $TableName"
     try {
+        Write-Output "Sending GET request to retrieve table details..."
         $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-                $table = [PSCustomObject]@{
-                    WorkspaceName = $webdata.name
-                    RetentionInDays = $webdata.properties.retentionInDays
-                    ArchiveRetentionInDays = $webData.properties.archiveRetentionInDays
-                    TotalRetentionInDays = $webData.properties.totalRetentionInDays
-            }
-            $tables.Add($table)
+        Write-Output "Successfully retrieved table information for: $TableName"
+        Write-Output "Table Name: $($webData.name)"
+        Write-Output "RetentionInDays: $($webData.properties.retentionInDays)"
+        Write-Output "TotalRetentionInDays: $($webData.properties.totalRetentionInDays)"
+        
+        $table = [PSCustomObject]@{
+            WorkspaceName = $webdata.name
+            RetentionInDays = $webdata.properties.retentionInDays
+            ArchiveRetentionInDays = $webData.properties.archiveRetentionInDays
+            TotalRetentionInDays = $webData.properties.totalRetentionInDays
+        }
+        $tables.Add($table)
+        Write-Output "Successfully processed table: $TableName"
     }
     catch {
-        Write-Error "Unable to list the table with error code: $($_.Exception.Message)" -ErrorAction Stop
+        $errorDetails = $_.Exception.Message
+        Write-Output "ERROR: Failed to retrieve table '$TableName' information"
+        Write-Output "Error Message: $errorDetails"
+        if ($_.Exception.Response) {
+            Write-Output "HTTP Status Code: $($_.Exception.Response.StatusCode.value__)"
+        }
+        Write-Error "Unable to list the table '$TableName' with error code: $errorDetails" -ErrorAction Stop
     }
 
-
+    Write-Output "--- Finished processing table: $TableName ---"
 }
 
 Write-Output $tables
