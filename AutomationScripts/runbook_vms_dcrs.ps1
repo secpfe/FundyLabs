@@ -290,3 +290,65 @@ foreach ($vmName in $vmNames) {
     $associationName = "$vmName-DCR-Association"
     New-AzDataCollectionRuleAssociation -TargetResourceId $targetResourceId -DataCollectionRuleId $dataCollectionRuleId -AssociationName $associationName
 }
+
+# Create Sentinel Incident
+Write-Output "=== Creating Sentinel Incident ==="
+try {
+    # Get existing context or reconnect if needed
+    Write-Output "Getting Azure context for incident creation..."
+    $context = Get-AzContext
+    if (-not $context -or -not $context.Subscription) {
+        Write-Output "No valid context found, reconnecting..."
+        $context = (Connect-AzAccount -Identity).context
+    }
+    Write-Output "Connected successfully. Subscription: $($context.Subscription.Id)"
+    
+    Write-Output "Getting access token for incident creation..."
+    $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
+    $tokenString = $token.Token | ConvertFrom-SecureString -AsPlainText
+    $authHeader = @{
+        'Content-Type'  = 'application/json'
+        'Authorization' = "Bearer $tokenString"
+    }
+    Write-Output "Access token obtained"
+    
+    $SubscriptionId = $context.Subscription.Id
+    $serverUrl = "https://management.azure.com"
+    
+    # Generate a unique incident ID (GUID)
+    $incidentId = [System.Guid]::NewGuid().ToString()
+    
+    # Construct the incident API URI
+    $incidentUri = "$serverUrl/subscriptions/${SubscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/${workspaceName}/providers/Microsoft.SecurityInsights/incidents/${incidentId}?api-version=2022-12-01-preview"
+    
+    # Prepare incident body
+    # Note: firstActivityTimeUtc and lastActivityTimeUtc are optional - system sets them automatically
+    # Classification values: Undetermined, TruePositive, BenignPositive, FalsePositive
+    $incidentBody = @{
+        properties = @{
+            title = "Suspected phishing activity"
+            description = "Phishing activity detected"
+            severity = "Informational"
+            status = "Closed"
+            classification = "BenignPositive"
+            classificationReason = "SuspiciousButExpected"
+        }
+    }
+    
+    Write-Output "Creating Sentinel incident: $($incidentBody.properties.title)..."
+    $incidentBodyJson = $incidentBody | ConvertTo-Json -Depth 10 -EnumsAsStrings
+    $response = Invoke-RestMethod -Uri $incidentUri -Method "Put" -Headers $authHeader -Body $incidentBodyJson
+    Write-Output "Incident created successfully!"
+    Write-Output "Incident ID: $incidentId"
+    Write-Output "Incident Title: $($response.properties.title)"
+    Write-Output "Incident Severity: $($response.properties.severity)"
+    Write-Output "Incident Status: $($response.properties.status)"
+}
+catch {
+    Write-Output "ERROR: Failed to create Sentinel incident - $($_.Exception.Message)"
+    if ($_.ErrorDetails.Message) {
+        Write-Output "Error Details: $($_.ErrorDetails.Message)"
+    }
+    # Don't fail the entire script if incident creation fails
+    Write-Warning "Incident creation failed, but DCR configuration completed successfully."
+}
