@@ -48,7 +48,7 @@ $location = $resourceGroup.Location
     }
 
     try {
-        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
     }
     catch {
         Write-Error "Unable to update the workspace properties with error code: $($_.Exception.Message)" -ErrorAction Stop
@@ -74,20 +74,22 @@ $TableNames = @("AzureActivity","SecurityEvent")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
 
-$argHash = @{}
-$argHash.properties = @{
-    retentionInDays         = "$RetentionInDays"
-    totalRetentionInDays  = "$TotalRetentionInDays"
-}
-
 $tables = [System.Collections.Generic.List[PSObject]]::new()
 
 foreach ($TableName in $TableNames) {
     $serverUrl = "https://management.azure.com"
-    $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}/Tables/${TableName}/?api-version=2023-09-01"
+    $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}/Tables/${TableName}?api-version=2023-09-01"
+
+    $argHash = @{
+        location = $location
+        properties = @{
+            retentionInDays         = $RetentionInDays
+            totalRetentionInDays    = $TotalRetentionInDays
+        }
+    }
 
     try {
-        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+        Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($argHash  | ConvertTo-Json -EnumsAsStrings -Depth 50)
         }
     catch {
         Write-Error "Unable to update the table with error code: $($_.Exception.Message)" -ErrorAction Stop
@@ -130,7 +132,7 @@ $appsetting = @{
 }
 
 try {
-    Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $AuthHeader -Body ($appsetting  | ConvertTo-Json -EnumsAsStrings -Depth 50)
+    Invoke-RestMethod -Uri $baseUri -Method "Put" -Headers $authHeader -Body ($appsetting  | ConvertTo-Json -EnumsAsStrings -Depth 50)
     }
 catch {
     Write-Output "Unable to update the webapp with error code: $($_.Exception.Message)" 
