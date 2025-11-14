@@ -32,12 +32,15 @@ $serverUrl = "https://management.azure.com"
 $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}?api-version=2023-09-01"
 
 # Get the resource group location
-$resourceGroup = Get-AzResourceGroup -Name $ResourceGroup
+$resourceGroupName = $ResourceGroup  # Save as string first
+$resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
 if (!$resourceGroup) {
     Write-Output "Resource group '$resourceGroupName' not found." -ForegroundColor Red
     exit
 }
 
+# Ensure $ResourceGroup stays as string
+$ResourceGroup = $resourceGroupName
 $location = $resourceGroup.Location
 
     $argHash = @{
@@ -56,10 +59,12 @@ $location = $resourceGroup.Location
 
     try {
         $webData = Invoke-RestMethod -Method "Get" -Uri $baseUri -Headers $authHeader
-                $workspace = [PSCustomObject]@{
-                    WorkspaceName = $webdata.name
-                    RetentionInDays = $webdata.properties.retentionInDays
-            }
+        # Preserve Workspace name as string before overwriting workspace variable
+        $Workspace = $webData.name
+        $workspace = [PSCustomObject]@{
+            WorkspaceName = $webData.name
+            RetentionInDays = $webData.properties.retentionInDays
+        }
     }
     catch {
         Write-Output "Unable to list the workspace properties with error code: $($_.Exception.Message)" 
