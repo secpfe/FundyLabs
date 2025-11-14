@@ -1,3 +1,7 @@
+param (
+    [string]$workspaceName = "CyberSOCWS"
+)
+
 Import-Module Az.Compute
 Import-Module Az.Accounts
 Import-Module Az.Monitor
@@ -6,7 +10,6 @@ Connect-AzAccount -Identity
 
 $resourceGroupName = "CyberSOC"
 $resourceGroupNameOps = "ITOperations"
-$workspaceName = "CyberSOCWS"
 $dcrName = "Minimal-Servers"
 $powershellDcrName = "PowerShellLogs"
 $linuxDcrName = "Minimal-Linux"
@@ -19,7 +22,19 @@ $vmNames = @("mserv", "win10", "dc")
 # Get the resource group location
 $resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
 $location = $resourceGroup.Location
-$workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName -Name $workspaceName
+# Try to get workspace with provided/default name, fallback to discovery if not found
+try {
+    $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName -Name $workspaceName -ErrorAction Stop
+} catch {
+    # Workspace with provided name not found, discover dynamically
+    Write-Output "Workspace '$workspaceName' not found, discovering workspace from resource group..."
+    $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName | Select-Object -First 1
+    if (-not $workspace) {
+        throw "No Log Analytics workspace found in resource group $resourceGroupName"
+    }
+    $workspaceName = $workspace.Name
+    Write-Output "Discovered workspace: $workspaceName"
+}
 # Prepare DCR details
 $workspaceResourceId = $workspace.ResourceId
 $workspaceId = $workspace.CustomerId

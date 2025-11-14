@@ -11,9 +11,9 @@
         },
         "workspaceName": {
             "type": "string",
-            "defaultValue": "CyberSOCWS",
+            "defaultValue": "[concat('CyberSOCWS', uniqueString(resourceGroup().id))]",
             "metadata": {
-                "description": "Name for the Log Analytics workspace"
+                "description": "Name for the Log Analytics workspace with 13 random characters"
             }
         },
         "pricingTier": {

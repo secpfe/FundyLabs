@@ -179,7 +179,6 @@ try {
 
 # Variables
 $resourceGroupName = "CyberSOC"
-$workspaceName = "CyberSOCWS"
 $dcrName = "Minimal-Servers"
 $powershellDcrName = "PowerShellLogs"
 $linuxDcrName = "Minimal-Linux"
@@ -194,12 +193,13 @@ if (!$resourceGroup) {
 
 $location = $resourceGroup.Location
 
-# Retrieve the Log Analytics Workspace details
-$workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName -Name $workspaceName
+# Discover workspace from resource group
+$workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName | Select-Object -First 1
 if (!$workspace) {
-    Write-Output "Log Analytics Workspace '$workspaceName' not found in Resource Group '$resourceGroupName'" -ForegroundColor Red
+    Write-Output "No Log Analytics workspace found in Resource Group '$resourceGroupName'" -ForegroundColor Red
     exit
 }
+$workspaceName = $workspace.Name
 
 # Prepare DCR details
 $workspaceResourceId = $workspace.ResourceId

@@ -1,6 +1,23 @@
+param (
+    [string]$workspaceName = "CyberSOCWS"
+)
+
 #SETTINGS
 $ResourceGroup = "CyberSOC"
-$Workspace = "CyberSOCWS"
+# Try to get workspace with provided/default name, fallback to discovery if not found
+try {
+    $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup -Name $workspaceName -ErrorAction Stop
+    $Workspace = $workspace.Name
+} catch {
+    # Workspace with provided name not found, discover dynamically
+    Write-Output "Workspace '$workspaceName' not found, discovering workspace from resource group..."
+    $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup | Select-Object -First 1
+    if (-not $workspace) {
+        throw "No Log Analytics workspace found in resource group $ResourceGroup"
+    }
+    $Workspace = $workspace.Name
+    Write-Output "Discovered workspace: $Workspace"
+}
 $RetentionInDays = 60
 
 $context = (Connect-AzAccount -Identity).context
@@ -17,7 +34,7 @@ $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${Resou
 # Get the resource group location
 $resourceGroup = Get-AzResourceGroup -Name $ResourceGroup
 if (!$resourceGroup) {
-    Write-Output "Resource group '$resourceGroupName' not found." -ForegroundColor Red
+        Write-Output "Resource group '$ResourceGroup' not found." -ForegroundColor Red
     exit
 }
 
@@ -52,8 +69,7 @@ $location = $resourceGroup.Location
 Write-Output $workspace
 
 #SETTINGS
-$ResourceGroup = "CyberSOC"
-$Workspace = "CyberSOCWS"
+# $ResourceGroup and $Workspace already set above
 $TableNames = @("AzureActivity","SecurityEvent")
 $RetentionInDays = 90
 $TotalRetentionInDays = 120
