@@ -47,11 +47,13 @@ $Command = @"
 #!/bin/bash
 sudo apt-get update -y
 sudo apt-get install -y python3-pip python3-venv freerdp2-x11 xvfb
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
+
+python3 -m pip install --user --upgrade pipx
 export PATH="`$PATH`:`$HOME/.local/bin"
-python3 -m pipx install "impacket==0.9.22"
-pip3 install ldap3
+python3 -m pipx install --force "impacket==0.9.22"
+# Required because old Impacket imports pkg_resources.
+python3 -m pipx inject impacket "setuptools<81"
+python3 -m pip install ldap3
 
 cat << 'EOF' > /tmp/temp_script.py
 $PythonScript
