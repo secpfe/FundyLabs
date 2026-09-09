@@ -8,8 +8,10 @@ Import-Module Az.Monitor
 
 Connect-AzAccount -Identity
 
-$resourceGroupName = "CyberSOC"
-$resourceGroupNameOps = "ITOperations"
+$resourceGroupName = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*CyberSOC*' } | Select-Object -First 1).ResourceGroupName
+if (-not $resourceGroupName) { throw "CyberSOC resource group not found." }
+$resourceGroupNameOps = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*ITOperations*' } | Select-Object -First 1).ResourceGroupName
+if (-not $resourceGroupNameOps) { throw "ITOperations resource group not found." }
 $dcrName = "Minimal-Servers"
 $powershellDcrName = "PowerShellLogs"
 $linuxDcrName = "Minimal-Linux"

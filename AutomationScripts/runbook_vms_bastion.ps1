@@ -4,7 +4,8 @@ Import-Module Az.Accounts
 Connect-AzAccount -Identity
 
 
-$resourceGroupNameOps = "ITOperations"
+$resourceGroupNameOps = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*ITOperations*' } | Select-Object -First 1).ResourceGroupName
+if (-not $resourceGroupNameOps) { throw "ITOperations resource group not found." }
 $bastionName = "bastion-gw01"
 
 

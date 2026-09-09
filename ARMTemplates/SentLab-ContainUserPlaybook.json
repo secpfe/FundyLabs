@@ -15,6 +15,13 @@
             "metadata": {
                 "description": "Location for the Logic App and connections"
             }
+        },
+        "automationResourceGroupName": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().name]",
+            "metadata": {
+                "description": "Resource group containing the SentinelAutomation account"
+            }
         }
     },
     "variables": {
@@ -73,6 +80,9 @@
                         "$connections": {
                             "defaultValue": {},
                             "type": "Object"
+                        },
+                        "automationResourceGroupName": {
+                            "type": "String"
                         }
                     },
                     "triggers": {
@@ -135,7 +145,7 @@
                                                 "parameters": "@variables('CurrentAccount')"
                                             }
                                         },
-                                        "path": "/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent('CyberSOC')}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent('SentinelAutomation')}/jobs",
+                                        "path": "/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(parameters('automationResourceGroupName'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent('SentinelAutomation')}/jobs",
                                         "queries": {
                                             "x-ms-api-version": "2015-10-31",
                                             "runbookName": "ContainUser",
@@ -172,6 +182,9 @@
                     "outputs": {}
                 },
                 "parameters": {
+                    "automationResourceGroupName": {
+                        "value": "[parameters('automationResourceGroupName')]"
+                    },
                     "$connections": {
                         "value": {
                             "azuresentinel": {

@@ -1,7 +1,8 @@
 #SETTINGS
-$ResourceGroup = "CyberSOC"
 Start-Sleep -Seconds 120
 $context = (Connect-AzAccount -Identity).context
+$ResourceGroup = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*CyberSOC*' } | Select-Object -First 1).ResourceGroupName
+if (-not $ResourceGroup) { throw "CyberSOC resource group not found." }
 # Discover workspace from resource group
 $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $ResourceGroup | Select-Object -First 1
 if (-not $workspace) {

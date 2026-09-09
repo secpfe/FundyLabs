@@ -1,9 +1,10 @@
 #SETTINGS
-$ResourceGroup = "ITOperations"
 $Command = "mv /home/site/wwwroot/config.ini /home/site/"
 Start-Sleep -Seconds 120
 
 $context = (Connect-AzAccount -Identity).context
+$ResourceGroup = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*ITOperations*' } | Select-Object -First 1).ResourceGroupName
+if (-not $ResourceGroup) { throw "ITOperations resource group not found." }
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
     'Content-Type'  = 'application/json'

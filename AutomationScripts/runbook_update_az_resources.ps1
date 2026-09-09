@@ -151,7 +151,8 @@ Write-Output $tables
 
 #SETTINGS
 Write-Output "=== Starting webApp configuration update ==="
-$ResourceGroup = "ITOperations"
+$ResourceGroup = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*ITOperations*' } | Select-Object -First 1).ResourceGroupName
+if (-not $ResourceGroup) { throw "ITOperations resource group not found." }
 $Command = "mv /home/site/wwwroot/config.ini /home/site/"
 
 Write-Output "Waiting 120 seconds before webApp update..."

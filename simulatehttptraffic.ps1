@@ -6,7 +6,8 @@ $authHeader = @{
 }
 $subscriptionId = $context.Subscription.Id
 
-$resourceGroupName = "ITOperations"
+$resourceGroupName = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*ITOperations*' } | Select-Object -First 1).ResourceGroupName
+if (-not $resourceGroupName) { throw "ITOperations resource group not found." }
 $appServiceName = "ASP-CyberSOC-b341"
 $apiVersion = "2024-04-01"
 

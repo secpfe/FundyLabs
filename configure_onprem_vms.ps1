@@ -11,8 +11,12 @@ Import-Module Az.Monitor
 
 Connect-AzAccount -Identity
 
+$resourceGroupNameOps = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*ITOperations*' } | Select-Object -First 1).ResourceGroupName
+if (-not $resourceGroupNameOps) { throw "ITOperations resource group not found." }
+$resourceGroupNameCyberSOC = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*CyberSOC*' } | Select-Object -First 1).ResourceGroupName
+if (-not $resourceGroupNameCyberSOC) { throw "CyberSOC resource group not found." }
 
-$resourceGroupName = "ITOperations"
+$resourceGroupName = $resourceGroupNameOps
 $DCvmName = "DC"
 
 
@@ -178,7 +182,7 @@ try {
 
 
 # Variables
-$resourceGroupName = "CyberSOC"
+$resourceGroupName = $resourceGroupNameCyberSOC
 $dcrName = "Minimal-Servers"
 $powershellDcrName = "PowerShellLogs"
 $linuxDcrName = "Minimal-Linux"
@@ -438,7 +442,6 @@ if (!$dcr) {
 }
 
 $dataCollectionRuleId = $dcr.Id
-$resourceGroupNameOps = "ITOperations"
 
 # Add DCR association to VMs
 foreach ($vmName in $vmNames) {
@@ -552,7 +555,7 @@ Write-Output "Azure Monitor Agent deployed for VM '$web01Name'."
 # Join machines to domain
 
 
-$resourceGroupName = "ITOperations"
+$resourceGroupName = $resourceGroupNameOps
 $domainName = "odomain.local"
 $domainAdminUser = $adminAccount
 $domainAdminPassword = $adminPassword
@@ -792,7 +795,6 @@ if (!$DCdcr) {
 }
 
 $dataCollectionRuleId = $DCdcr.Id
-$resourceGroupNameOps = "ITOperations"
 
 # Add DCR association to VMs
 $DCvm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $DCvmName
@@ -1394,7 +1396,7 @@ Write-Output "`n[+] Done. There should be Event Log for a Type 2 logon, and the 
 "@
 
 
-$output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupNameOps -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script
 $output.Value | ForEach-Object { $_.Message }
 
 
@@ -1525,7 +1527,7 @@ Write-Output "`n[+] There should be Event Log for a Type 2 logon for `$UserName.
 "@
 
 
-$output = Invoke-AzVMRunCommand -ResourceGroupName "ITOperations" -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script2
+$output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupNameOps -VMName "win10" -CommandId "RunPowerShellScript" -ScriptString $w10script2
 $output.Value | ForEach-Object { $_.Message }
 
 
