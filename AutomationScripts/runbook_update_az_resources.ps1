@@ -6,7 +6,8 @@ Write-Output "=== Script started ==="
 Write-Output "Parameter workspaceName: $workspaceName"
 
 #SETTINGS
-$ResourceGroup = "CyberSOC"
+$ResourceGroup = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*CyberSOC*' } | Select-Object -First 1).ResourceGroupName
+if (-not $ResourceGroup) { throw "CyberSOC resource group not found." }
 $RetentionInDays = 60
 
 Write-Output "Connecting to Azure..."
