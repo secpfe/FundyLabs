@@ -13,13 +13,28 @@
             "type": "string",
             "defaultValue": "",
             "metadata": {
-                "description": "VM SKU size"
+                "description": "VM SKU size for the targeted VM"
             }
         },
         "adminPassword": {
             "type": "securestring",
             "metadata": {
                 "description": "Admin password for the VMs"
+            }
+        },
+        "targetVm": {
+            "type": "string",
+            "defaultValue": "none",
+            "allowedValues": [
+                "none",
+                "dc",
+                "mserv",
+                "win10",
+                "web01",
+                "bastion-gw01"
+            ],
+            "metadata": {
+                "description": "Which VM to deploy in this invocation. 'none' deploys shared network only."
             }
         }
     },
@@ -32,88 +47,6 @@
         "dcOsDiskId": "[variables('dcOsDiskIds')[resourceGroup().location]]"
     },
     "resources": [
-        {
-            "type": "Microsoft.Compute/virtualMachines",
-            "apiVersion": "2021-07-01",
-            "name": "win10",
-            "location": "[resourceGroup().location]",
-            "identity": {
-                "type": "SystemAssigned"
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/networkInterfaces', 'nic-win10')]"
-            ],
-            "properties": {
-                "hardwareProfile": {
-                    "vmSize": "[parameters('vm_sku')]"
-                },
-                "osProfile": {
-                    "computerName": "win10",
-                    "adminUsername": "[parameters('adminUser')]",
-                    "adminPassword": "[parameters('adminPassword')]"
-                },
-                "storageProfile": {
-                    "imageReference": {
-                        "publisher": "MicrosoftWindowsDesktop",
-                        "offer": "windows-11",
-                        "sku": "win11-25h2-pro",
-                        "version": "latest"
-                    },
-                    "osDisk": {
-                        "createOption": "FromImage",
-                        "managedDisk": {
-                            "storageAccountType": "Premium_LRS"
-                        }
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', 'nic-win10')]"
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            "type": "Microsoft.Network/publicIPAddresses",
-            "apiVersion": "2020-08-01",
-            "name": "PublicIP-win10",
-            "location": "[resourceGroup().location]",
-            "sku": {
-                "name": "Standard"
-            },
-            "properties": {
-                "publicIPAllocationMethod": "Static"
-            }
-        },        
-        {
-            "type": "Microsoft.Network/networkInterfaces",
-            "apiVersion": "2017-06-01",
-            "name": "nic-win10",
-            "location": "[resourceGroup().location]",
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
-                "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-win10')]"
-            ],
-            "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "ipConfig1",
-                        "properties": {
-                            "subnet": {
-                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'Corp_VNet', 'default')]"
-                            },
-                            "privateIPAllocationMethod": "Static",
-                            "privateIPAddress": "10.0.0.6",
-                            "publicIPAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-win10')]"
-                            }
-                        }
-                    }
-                ]
-            }
-        },        
         {
             "type": "Microsoft.Network/networkSecurityGroups",
             "apiVersion": "2017-06-01",
@@ -151,6 +84,50 @@
             }
         },
         {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2017-06-01",
+            "name": "Corp_VNet",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', 'Corp_VNet-NSG')]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/16"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "properties": {
+                            "addressPrefix": "10.0.0.0/24",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'Corp_VNet-NSG')]"
+                            }
+                        }
+                    }
+                ],
+                "dhcpOptions": {
+                    "dnsServers": [
+                        "10.0.0.4"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-08-01",
+            "name": "PublicIP-dc",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static"
+            }
+        },
+        {
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-08-01",
             "name": "PublicIP-mserv",
@@ -165,7 +142,7 @@
         {
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-08-01",
-            "name": "PublicIP-dc",
+            "name": "PublicIP-win10",
             "location": "[resourceGroup().location]",
             "sku": {
                 "name": "Standard"
@@ -185,37 +162,44 @@
             "properties": {
                 "publicIPAllocationMethod": "Static"
             }
-        },        
+        },
         {
-            "type": "Microsoft.Network/virtualNetworks",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-08-01",
+            "name": "PublicIP-bastion-gw01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2017-06-01",
-            "name": "Corp_VNet",
+            "name": "nic-dc",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[resourceId('Microsoft.Network/networkSecurityGroups', 'Corp_VNet-NSG')]"
+                "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
+                "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-dc')]"
             ],
             "properties": {
-                "addressSpace": {
-                    "addressPrefixes": [
-                        "10.0.0.0/16"
-                    ]
-                },
-               "subnets": [
+                "ipConfigurations": [
                     {
-                        "name": "default",
+                        "name": "ipConfig1",
                         "properties": {
-                            "addressPrefix": "10.0.0.0/24",
-                            "networkSecurityGroup": {
-                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'Corp_VNet-NSG')]"
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'Corp_VNet', 'default')]"
+                            },
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "10.0.0.4",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-dc')]"
                             }
                         }
                     }
-                ],
-                "dhcpOptions": {
-                    "dnsServers": [
-                        "10.0.0.4"
-                    ]
-                }
+                ]
             }
         },
         {
@@ -248,11 +232,11 @@
         {
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2017-06-01",
-            "name": "nic-dc",
+            "name": "nic-win10",
             "location": "[resourceGroup().location]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
-                "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-dc')]"
+                "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-win10')]"
             ],
             "properties": {
                 "ipConfigurations": [
@@ -263,9 +247,9 @@
                                 "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'Corp_VNet', 'default')]"
                             },
                             "privateIPAllocationMethod": "Static",
-                            "privateIPAddress": "10.0.0.4",
+                            "privateIPAddress": "10.0.0.6",
                             "publicIPAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-dc')]"
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-win10')]"
                             }
                         }
                     }
@@ -300,6 +284,68 @@
             }
         },
         {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2017-06-01",
+            "name": "nic-bastion-gw01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
+                "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-bastion-gw01')]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipConfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'Corp_VNet', 'default')]"
+                            },
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "10.0.0.11",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-bastion-gw01')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "condition": "[equals(parameters('targetVm'), 'dc')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2021-07-01",
+            "name": "dc",
+            "location": "[resourceGroup().location]",
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', 'nic-dc')]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vm_sku')]"
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "createOption": "Attach",
+                        "osType": "Windows",
+                        "managedDisk": {
+                            "id": "[variables('dcOsDiskId')]"
+                        }
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', 'nic-dc')]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "condition": "[equals(parameters('targetVm'), 'mserv')]",
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-07-01",
             "name": "mserv",
@@ -343,39 +389,51 @@
             }
         },
         {
+            "condition": "[equals(parameters('targetVm'), 'win10')]",
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-07-01",
-            "name": "dc",
+            "name": "win10",
             "location": "[resourceGroup().location]",
             "identity": {
                 "type": "SystemAssigned"
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Network/networkInterfaces', 'nic-dc')]"
+                "[resourceId('Microsoft.Network/networkInterfaces', 'nic-win10')]"
             ],
             "properties": {
                 "hardwareProfile": {
                     "vmSize": "[parameters('vm_sku')]"
                 },
+                "osProfile": {
+                    "computerName": "win10",
+                    "adminUsername": "[parameters('adminUser')]",
+                    "adminPassword": "[parameters('adminPassword')]"
+                },
                 "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsDesktop",
+                        "offer": "windows-11",
+                        "sku": "win11-25h2-pro",
+                        "version": "latest"
+                    },
                     "osDisk": {
-                        "createOption": "Attach",
-                        "osType": "Windows",
+                        "createOption": "FromImage",
                         "managedDisk": {
-                            "id": "[variables('dcOsDiskId')]"
+                            "storageAccountType": "Premium_LRS"
                         }
                     }
                 },
                 "networkProfile": {
                     "networkInterfaces": [
                         {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', 'nic-dc')]"
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', 'nic-win10')]"
                         }
                     ]
                 }
             }
         },
         {
+            "condition": "[equals(parameters('targetVm'), 'web01')]",
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-07-01",
             "name": "web01",
@@ -401,7 +459,7 @@
                         "offer": "ubuntu-22_04-lts",
                         "sku": "server",
                         "version": "latest"
-                        },
+                    },
                     "osDisk": {
                         "createOption": "FromImage",
                         "managedDisk": {
@@ -419,86 +477,48 @@
             }
         },
         {
-    "type": "Microsoft.Network/publicIPAddresses",
-    "apiVersion": "2020-08-01",
-    "name": "PublicIP-bastion-gw01",
-    "location": "[resourceGroup().location]",
-    "sku": {
-                "name": "Standard"
+            "condition": "[equals(parameters('targetVm'), 'bastion-gw01')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2021-07-01",
+            "name": "bastion-gw01",
+            "location": "[resourceGroup().location]",
+            "identity": {
+                "type": "SystemAssigned"
             },
-    "properties": {
-        "publicIPAllocationMethod": "Static"
-    }
-},
-{
-    "type": "Microsoft.Network/networkInterfaces",
-    "apiVersion": "2017-06-01",
-    "name": "nic-bastion-gw01",
-    "location": "[resourceGroup().location]",
-    "dependsOn": [
-        "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
-        "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-bastion-gw01')]"
-    ],
-    "properties": {
-        "ipConfigurations": [
-            {
-                "name": "ipConfig1",
-                "properties": {
-                    "subnet": {
-                        "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'Corp_VNet', 'default')]"
-                    },
-                    "privateIPAllocationMethod": "Static",
-                    "privateIPAddress": "10.0.0.11",
-                    "publicIPAddress": {
-                        "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-bastion-gw01')]"
-                    }
-                }
-            }
-        ]
-    }
-},
-{
-    "type": "Microsoft.Compute/virtualMachines",
-    "apiVersion": "2021-07-01",
-    "name": "bastion-gw01",
-    "location": "[resourceGroup().location]",
-    "identity": {
-        "type": "SystemAssigned"
-    },
-    "dependsOn": [
-        "[resourceId('Microsoft.Network/networkInterfaces', 'nic-bastion-gw01')]"
-    ],
-    "properties": {
-        "hardwareProfile": {
-            "vmSize": "[parameters('vm_sku')]"
-        },
-        "osProfile": {
-            "computerName": "bastion-gw01",
-            "adminUsername": "[parameters('adminUser')]",
-            "adminPassword": "[parameters('adminPassword')]"
-        },
-        "storageProfile": {
-           "imageReference": {
-                "publisher": "Canonical",
-                "offer": "ubuntu-22_04-lts",
-                "sku": "server",
-                "version": "latest"
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', 'nic-bastion-gw01')]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vm_sku')]"
                 },
-            "osDisk": {
-                "createOption": "FromImage",
-                "managedDisk": {
-                    "storageAccountType": "Premium_LRS"
+                "osProfile": {
+                    "computerName": "bastion-gw01",
+                    "adminUsername": "[parameters('adminUser')]",
+                    "adminPassword": "[parameters('adminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "Canonical",
+                        "offer": "ubuntu-22_04-lts",
+                        "sku": "server",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Premium_LRS"
+                        }
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', 'nic-bastion-gw01')]"
+                        }
+                    ]
                 }
             }
-        },
-        "networkProfile": {
-            "networkInterfaces": [
-                {
-                    "id": "[resourceId('Microsoft.Network/networkInterfaces', 'nic-bastion-gw01')]"
-                }
-            ]
         }
-    }
-}
     ]
 }

@@ -5,14 +5,20 @@ param (
 Write-Output "=== Script started ==="
 Write-Output "Parameter workspaceName: $workspaceName"
 
+Write-Output "Connecting to Azure with the Automation Account managed identity..."
+Disable-AzContextAutosave -Scope Process | Out-Null
+try {
+    $context = (Connect-AzAccount -Identity -ErrorAction Stop).Context
+}
+catch {
+    throw "Failed to connect to Azure with the Automation Account managed identity: $($_.Exception.Message)"
+}
+Write-Output "Connected successfully. Subscription: $($context.Subscription.Id)"
+
 #SETTINGS
 $ResourceGroup = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*CyberSOC*' } | Select-Object -First 1).ResourceGroupName
 if (-not $ResourceGroup) { throw "CyberSOC resource group not found." }
 $RetentionInDays = 60
-
-Write-Output "Connecting to Azure..."
-$context = (Connect-AzAccount -Identity).context
-Write-Output "Connected successfully. Subscription: $($context.Subscription.Id)"
 
 Write-Output "Looking for workspace '$workspaceName' in resource group '$ResourceGroup'..."
 # Try to get workspace with provided/default name, fallback to discovery if not found
