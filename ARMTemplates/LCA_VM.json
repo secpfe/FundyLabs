@@ -46,14 +46,7 @@
         }
     },
     "variables": {
-        "dcOsDiskIds": {
-            "northeurope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGNE/providers/Microsoft.Compute/disks/dc-osdisk-ne')]",
-            "canadacentral": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGCA/providers/Microsoft.Compute/disks/dc-osdisk-ca')]",
-            "japaneast": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGJP/providers/Microsoft.Compute/disks/dc-osdisk-jp')]",
-            "westus2": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGWU2/providers/Microsoft.Compute/disks/dc-osdisk-wu2')]",
-            "eastus2": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGEU2/providers/Microsoft.Compute/disks/dc-osdisk-eu2')]"
-        },
-        "dcOsDiskId": "[variables('dcOsDiskIds')[parameters('location')]]"
+        "dcOsDiskId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRG-dc/providers/Microsoft.Compute/disks/dc-osdisk')]"
     },
     "resources": [
         {
