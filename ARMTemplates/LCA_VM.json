@@ -36,22 +36,31 @@
             "metadata": {
                 "description": "Which VM to deploy in this invocation. 'none' deploys shared network only."
             }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Azure region for deployment. Defaults to resource group location; overridden by 00.PickRegion."
+            }
         }
     },
     "variables": {
         "dcOsDiskIds": {
             "northeurope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGNE/providers/Microsoft.Compute/disks/dc-osdisk-ne')]",
             "canadacentral": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGCA/providers/Microsoft.Compute/disks/dc-osdisk-ca')]",
-            "japaneast": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGJP/providers/Microsoft.Compute/disks/dc-osdisk-jp')]"
+            "japaneast": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGJP/providers/Microsoft.Compute/disks/dc-osdisk-jp')]",
+            "westus2": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGWU2/providers/Microsoft.Compute/disks/dc-osdisk-wu2')]",
+            "eastus2": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/TempRGEU2/providers/Microsoft.Compute/disks/dc-osdisk-eu2')]"
         },
-        "dcOsDiskId": "[variables('dcOsDiskIds')[resourceGroup().location]]"
+        "dcOsDiskId": "[variables('dcOsDiskIds')[parameters('location')]]"
     },
     "resources": [
         {
             "type": "Microsoft.Network/networkSecurityGroups",
             "apiVersion": "2017-06-01",
             "name": "Corp_VNet-NSG",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "properties": {
                 "securityRules": [
                     {
@@ -87,7 +96,7 @@
             "type": "Microsoft.Network/virtualNetworks",
             "apiVersion": "2017-06-01",
             "name": "Corp_VNet",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/networkSecurityGroups', 'Corp_VNet-NSG')]"
             ],
@@ -119,7 +128,7 @@
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-08-01",
             "name": "PublicIP-dc",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "sku": {
                 "name": "Standard"
             },
@@ -131,7 +140,7 @@
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-08-01",
             "name": "PublicIP-mserv",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "sku": {
                 "name": "Standard"
             },
@@ -143,7 +152,7 @@
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-08-01",
             "name": "PublicIP-win10",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "sku": {
                 "name": "Standard"
             },
@@ -155,7 +164,7 @@
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-08-01",
             "name": "PublicIP-web01",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "sku": {
                 "name": "Standard"
             },
@@ -167,7 +176,7 @@
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-08-01",
             "name": "PublicIP-bastion-gw01",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "sku": {
                 "name": "Standard"
             },
@@ -179,7 +188,7 @@
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2017-06-01",
             "name": "nic-dc",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
                 "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-dc')]"
@@ -206,7 +215,7 @@
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2017-06-01",
             "name": "nic-mserv",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
                 "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-mserv')]"
@@ -233,7 +242,7 @@
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2017-06-01",
             "name": "nic-win10",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
                 "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-win10')]"
@@ -260,7 +269,7 @@
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2017-06-01",
             "name": "nic-web01",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
                 "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-web01')]"
@@ -287,7 +296,7 @@
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2017-06-01",
             "name": "nic-bastion-gw01",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/virtualNetworks', 'Corp_VNet')]",
                 "[resourceId('Microsoft.Network/publicIPAddresses', 'PublicIP-bastion-gw01')]"
@@ -315,7 +324,7 @@
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-07-01",
             "name": "dc",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "identity": {
                 "type": "SystemAssigned"
             },
@@ -349,7 +358,7 @@
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-07-01",
             "name": "mserv",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "identity": {
                 "type": "SystemAssigned"
             },
@@ -393,7 +402,7 @@
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-07-01",
             "name": "win10",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "identity": {
                 "type": "SystemAssigned"
             },
@@ -437,7 +446,7 @@
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-07-01",
             "name": "web01",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "identity": {
                 "type": "SystemAssigned"
             },
@@ -481,7 +490,7 @@
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-07-01",
             "name": "bastion-gw01",
-            "location": "[resourceGroup().location]",
+            "location": "[parameters('location')]",
             "identity": {
                 "type": "SystemAssigned"
             },
