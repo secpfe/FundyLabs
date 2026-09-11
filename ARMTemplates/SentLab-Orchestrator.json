@@ -60,7 +60,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -82,7 +82,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -104,7 +104,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -126,7 +126,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -148,7 +148,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -170,7 +170,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -192,7 +192,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -214,7 +214,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -236,7 +236,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -258,7 +258,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -280,7 +280,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -302,7 +302,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -324,7 +324,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -346,7 +346,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -368,7 +368,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
@@ -390,7 +390,7 @@
             "properties": {
               "runbookType": "PowerShell72",
               "logProgress": true,
-              "logVerbose": true,
+              "logVerbose": false,
               "description": "[parameters('samplePowerShellRunbookDescription')]",
               "runSettings": {
                 "runtimeVersion": "7.2"
