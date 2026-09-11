@@ -95,6 +95,14 @@ Remove-PSDrive -Name TempShare
 
 Write-Output "Accessed a folder under reportAdmin account, with downgraded NTLM."
 
+# Disable RemoteRegistry so it can't trigger-start on its own; secretsdump from web01 re-enables it, starts it, then stops it (7036 pair).
+if ((Get-Service -Name RemoteRegistry).Status -ne 'Stopped') {
+    Stop-Service -Name RemoteRegistry -Force
+    (Get-Service -Name RemoteRegistry).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(10))
+}
+Set-Service -Name RemoteRegistry -StartupType Disabled
+Write-Output "RemoteRegistry left stopped (StartupType=Disabled)."
+
 "@
 
 $output = Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId "RunPowerShellScript" -ScriptString $mservscript
