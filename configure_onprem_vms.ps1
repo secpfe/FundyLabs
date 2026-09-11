@@ -500,13 +500,14 @@ Write-Output "DCR Association '$Win10PowershellassociationName' created for VM '
 # -----------------------------------------
 foreach ($vmName in $vmNames) {
     # Enable the Azure Monitor extension
+    $vm = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $vmName
     $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
         -VMName $vmName `
         -Name "AzureMonitorWindowsAgent" `
         -Publisher "Microsoft.Azure.Monitor" `
         -ExtensionType "AzureMonitorWindowsAgent" `
         -TypeHandlerVersion "1.0" `
-        -Location $location
+        -Location $vm.Location
 
     Write-Output "Azure Monitor Agent deployed for VM '$vmName'." 
 }
@@ -547,7 +548,7 @@ Write-Output "DCR Association '$LinuxassociationName' created for VM '$web01Name
 
 
 # Deploy Azure Monitor Agent to the Linux VM
-$extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $web01Name -Name "AzureMonitorLinuxAgent" -Publisher "Microsoft.Azure.Monitor"     -ExtensionType "AzureMonitorLinuxAgent"     -TypeHandlerVersion "1.0"     -Location $location
+$extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $web01Name -Name "AzureMonitorLinuxAgent" -Publisher "Microsoft.Azure.Monitor"     -ExtensionType "AzureMonitorLinuxAgent"     -TypeHandlerVersion "1.0"     -Location $web01.Location
 Write-Output "Azure Monitor Agent deployed for VM '$web01Name'." 
 
 
@@ -819,7 +820,7 @@ $extension = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
         -Publisher "Microsoft.Azure.Monitor" `
         -ExtensionType "AzureMonitorWindowsAgent" `
         -TypeHandlerVersion "1.0" `
-        -Location $location
+        -Location $DCvm.Location
 
 Write-Output "Azure Monitor Agent deployed for VM '$DCvmName'." 
 

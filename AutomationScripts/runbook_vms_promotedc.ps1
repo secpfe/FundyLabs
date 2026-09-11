@@ -9,7 +9,6 @@ param (
 
 Import-Module Az.Compute
 Import-Module Az.Accounts
-Import-Module Az.Monitor
 
 Connect-AzAccount -Identity
 
