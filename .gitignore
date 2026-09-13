@@ -1,3 +1,5 @@
 # Ignore all files in LCAScripts directory
 LCAScripts/
 Copy-DcVhdToRegions.ps1
+Publish-VulnUpPackage.ps1
+Publish-ArmTemplates.ps1

@@ -20,22 +20,44 @@ $vmNames = @("mserv", "win10")
 $web01 = Get-AzVM -ResourceGroupName $resourceGroupNameOps -Name $web01Name
 $location = $web01.Location
 
-Write-Output "$(Get-Date -Format o) installing AMA on $web01Name"
-Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $web01Name `
+# Installed concurrently: each extension takes ~1-2.5 min on its own, and mserv/win10 are rebooting
+# from the domain join at this point, which stretches them further. 
+$installs = @{}
+
+Write-Output "$(Get-Date -Format o) starting AMA install on $web01Name"
+$installs[$web01Name] = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $web01Name `
     -Name "AzureMonitorLinuxAgent" -Publisher "Microsoft.Azure.Monitor" `
     -ExtensionType "AzureMonitorLinuxAgent" -TypeHandlerVersion "1.0" `
-    -Location $location -ErrorAction Stop
-Write-Output "$(Get-Date -Format o) AMA installed on $web01Name"
+    -Location $location -AsJob
 
 foreach ($vmName in $vmNames) {
-    Write-Output "$(Get-Date -Format o) installing AMA on $vmName"
-    Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
+    Write-Output "$(Get-Date -Format o) starting AMA install on $vmName"
+    $installs[$vmName] = Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps `
         -VMName $vmName `
         -Name "AzureMonitorWindowsAgent" `
         -Publisher "Microsoft.Azure.Monitor" `
         -ExtensionType "AzureMonitorWindowsAgent" `
         -TypeHandlerVersion "1.0" `
         -Location $location `
-        -ErrorAction Stop
-    Write-Output "$(Get-Date -Format o) AMA installed on $vmName"
+        -AsJob
+}
+
+$null = Wait-Job -Job $installs.Values
+
+$failed = New-Object System.Collections.Generic.List[string]
+foreach ($vmName in $installs.Keys) {
+    $job = $installs[$vmName]
+    $null = Receive-Job -Job $job -ErrorAction SilentlyContinue -ErrorVariable jobError
+    if ($job.State -ne 'Completed') {
+        $reason = if ($jobError) { ($jobError | Select-Object -First 1).ToString() } else { "job state $($job.State)" }
+        Write-Output "$(Get-Date -Format o) AMA FAILED on ${vmName}: $reason"
+        $failed.Add($vmName) | Out-Null
+    } else {
+        Write-Output "$(Get-Date -Format o) AMA installed on $vmName"
+    }
+    Remove-Job -Job $job -Force
+}
+
+if ($failed.Count -gt 0) {
+    throw "AMA installation failed on: $($failed -join ', ')"
 }

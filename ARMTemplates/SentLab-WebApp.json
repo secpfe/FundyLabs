@@ -25,10 +25,17 @@
     "skuCode": {
       "defaultValue": "P0V4",
       "type": "String"
+    },
+    "packageUri": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "description": "Read-only SAS URL of vulnUp.zip in the regional storage account. Leave empty to deploy an empty site."
+      }
     }
   },
   "variables": {
-    "uniqueName": "[concat(parameters('namePrefix'), uniqueString(resourceGroup().id))]"
+    "uniqueName": "[parameters('namePrefix')]"
   },
   "resources": [
     {
@@ -42,7 +49,7 @@
       "properties": {
         "name": "[variables('uniqueName')]",
         "siteConfig": {
-          "appSettings": [],
+          "appSettings": "[if(empty(parameters('packageUri')), createArray(), createArray(createObject('name', 'WEBSITE_RUN_FROM_PACKAGE', 'value', parameters('packageUri'))))]",
           "linuxFxVersion": "PHP|8.3",
           "alwaysOn": "false",
           "ftpsState": "[parameters('ftpsState')]"
@@ -99,19 +106,6 @@
         "numberOfWorkers": "1",
         "reserved": true,
         "zoneRedundant": false
-      }
-    },
-    {
-      "type": "Microsoft.Web/sites/sourcecontrols",
-      "apiVersion": "2021-02-01",
-      "name": "[concat(variables('uniqueName'),'/web')]",
-      "dependsOn": [
-        "[resourceId('Microsoft.Web/sites', variables('uniqueName'))]"
-      ],
-      "properties": {
-        "repoUrl": "https://github.com/secpfe/vulnUp",
-        "branch": "main",
-        "isManualIntegration": true
       }
     }
   ]

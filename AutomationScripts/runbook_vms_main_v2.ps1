@@ -78,14 +78,23 @@ function Wait-ForAutomationJob {
         [string]$AutomationAccountName,
         [string]$ResourceGroupName,
         [Guid]$JobId,
-        [string]$RunBookName
+        [string]$RunBookName,
+        [int]$TimeoutMinutes = 30
     )
+
+    # Poll interval drives how much of each step is pure sleep: at 30s the orchestrator lost ~80s
+    # across its four steps waiting on jobs that had already finished.
+    $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
+    $lastStatus = $null
 
     while ($true) {
         # Retrieve the job status
         $job = Get-AzAutomationJob -AutomationAccountName $AutomationAccountName -ResourceGroupName $ResourceGroupName -Id $JobId
 
-        Write-Output "Job $RunBookName Status: $($job.Status)"
+        if ($job.Status -ne $lastStatus) {
+            Write-Output "$(Get-Date -Format 'HH:mm:ss') Job $RunBookName Status: $($job.Status)"
+            $lastStatus = $job.Status
+        }
 
         if ($job.Status -eq "Completed") {
             Write-Output "Job $RunBookName completed successfully!"
@@ -104,10 +113,16 @@ function Wait-ForAutomationJob {
             $JobId = $newJob.JobId  
             
             Write-Output "New job for $RunBookName started with JobId: $JobId"
+            $lastStatus = $null
+        }
+
+        if ((Get-Date) -ge $deadline) {
+            Write-Warning "Job $RunBookName still $($job.Status) after $TimeoutMinutes min; giving up on the wait."
+            break
         }
 
         # Wait for a few seconds before checking again
-        Start-Sleep -Seconds 30
+        Start-Sleep -Seconds 5
     }
 }
 
