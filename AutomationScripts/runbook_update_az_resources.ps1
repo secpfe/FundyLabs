@@ -7,12 +7,16 @@ Write-Output "Parameter workspaceName: $workspaceName"
 
 Write-Output "Connecting to Azure with the Automation Account managed identity..."
 Disable-AzContextAutosave -Scope Process | Out-Null
-try {
-    $context = (Connect-AzAccount -Identity -ErrorAction Stop).Context
-}
-catch {
-    throw "Failed to connect to Azure with the Automation Account managed identity: $($_.Exception.Message)"
-}
+# The sliced subscription appears with a delay, so wait for a usable context: Connect-AzAccount can
+# hit its 100s HttpClient timeout and return nothing while the sign-in later succeeds.
+$connectDeadline = (Get-Date).AddMinutes(6)
+do {
+    Connect-AzAccount -Identity -ErrorAction SilentlyContinue | Out-Null
+    $context = Get-AzContext
+    if ($context.Subscription.Id) { break }
+    Start-Sleep -Seconds 15
+} while ((Get-Date) -lt $connectDeadline)
+if (-not $context.Subscription.Id) { throw "Failed to connect to Azure with the Automation Account managed identity." }
 Write-Output "Connected successfully. Subscription: $($context.Subscription.Id)"
 
 #SETTINGS

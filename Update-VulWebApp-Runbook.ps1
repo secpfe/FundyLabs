@@ -1,8 +1,17 @@
 #SETTINGS
 $Command = "mv /home/site/wwwroot/config.ini /home/site/"
-Start-Sleep -Seconds 120
 
-$context = (Connect-AzAccount -Identity).context
+# The sliced subscription appears with a delay, so wait for it instead of guessing a fixed sleep:
+# Connect-AzAccount can hit its 100s HttpClient timeout and return nothing while the sign-in later
+# succeeds, and reading its return value then yields an empty subscription id downstream.
+$connectDeadline = (Get-Date).AddMinutes(6)
+do {
+    Connect-AzAccount -Identity -ErrorAction SilentlyContinue | Out-Null
+    $context = Get-AzContext
+    if ($context.Subscription.Id) { break }
+    Start-Sleep -Seconds 15
+} while ((Get-Date) -lt $connectDeadline)
+if (-not $context.Subscription.Id) { throw "No Azure context after Connect-AzAccount -Identity." }
 $ResourceGroup = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*ITOperations*' } | Select-Object -First 1).ResourceGroupName
 if (-not $ResourceGroup) { throw "ITOperations resource group not found." }
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id

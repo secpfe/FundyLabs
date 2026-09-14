@@ -1,6 +1,15 @@
 #SETTINGS
-Start-Sleep -Seconds 120
-$context = (Connect-AzAccount -Identity).context
+# The sliced subscription appears with a delay, so wait for it instead of guessing a fixed sleep:
+# Connect-AzAccount can hit its 100s HttpClient timeout and return nothing while the sign-in later
+# succeeds, and reading its return value then yields an empty subscription id in every URI below.
+$connectDeadline = (Get-Date).AddMinutes(6)
+do {
+    Connect-AzAccount -Identity -ErrorAction SilentlyContinue | Out-Null
+    $context = Get-AzContext
+    if ($context.Subscription.Id) { break }
+    Start-Sleep -Seconds 15
+} while ((Get-Date) -lt $connectDeadline)
+if (-not $context.Subscription.Id) { throw "No Azure context after Connect-AzAccount -Identity." }
 $ResourceGroup = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*CyberSOC*' } | Select-Object -First 1).ResourceGroupName
 if (-not $ResourceGroup) { throw "CyberSOC resource group not found." }
 # Discover workspace from resource group

@@ -1,4 +1,14 @@
-$context = (Connect-AzAccount -Identity).context
+# The sliced subscription appears with a delay, so wait for a usable context: Connect-AzAccount can
+# hit its 100s HttpClient timeout and return nothing while the sign-in later succeeds, and reading
+# its return value then yields an empty subscription id downstream.
+$connectDeadline = (Get-Date).AddMinutes(6)
+do {
+    Connect-AzAccount -Identity -ErrorAction SilentlyContinue | Out-Null
+    $context = Get-AzContext
+    if ($context.Subscription.Id) { break }
+    Start-Sleep -Seconds 15
+} while ((Get-Date) -lt $connectDeadline)
+if (-not $context.Subscription.Id) { throw "No Azure context after Connect-AzAccount -Identity." }
 $token = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id
 $authHeader = @{
     'Content-Type'  = 'application/json'

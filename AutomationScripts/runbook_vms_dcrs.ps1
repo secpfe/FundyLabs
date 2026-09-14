@@ -6,7 +6,16 @@ Import-Module Az.Compute
 Import-Module Az.Accounts
 Import-Module Az.Monitor
 
-Connect-AzAccount -Identity
+# The sliced subscription appears with a delay, so wait for a usable context: Connect-AzAccount can
+# hit its 100s HttpClient timeout and return nothing while the sign-in later succeeds.
+$connectDeadline = (Get-Date).AddMinutes(6)
+do {
+    Connect-AzAccount -Identity -ErrorAction SilentlyContinue | Out-Null
+    $context = Get-AzContext
+    if ($context.Subscription.Id) { break }
+    Start-Sleep -Seconds 15
+} while ((Get-Date) -lt $connectDeadline)
+if (-not $context.Subscription.Id) { throw "No Azure context after Connect-AzAccount -Identity." }
 
 $resourceGroupName = (Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like '*CyberSOC*' } | Select-Object -First 1).ResourceGroupName
 if (-not $resourceGroupName) { throw "CyberSOC resource group not found." }
@@ -301,7 +310,8 @@ try {
     $context = Get-AzContext
     if (-not $context -or -not $context.Subscription) {
         Write-Output "No valid context found, reconnecting..."
-        $context = (Connect-AzAccount -Identity).context
+        Connect-AzAccount -Identity | Out-Null
+        $context = Get-AzContext
     }
     Write-Output "Connected successfully. Subscription: $($context.Subscription.Id)"
     
