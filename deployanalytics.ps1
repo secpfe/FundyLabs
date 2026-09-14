@@ -18,6 +18,29 @@ $SubscriptionId = $context.Subscription.Id
 $serverUrl = "https://management.azure.com"
 $baseUri = $serverUrl + "/subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/${Workspace}"
 
+# The ARM front end intermittently answers 5xx with an HTML error page instead of JSON, and a single
+# unretried attempt silently drops an analytics rule the lab depends on.
+function Invoke-ArmWithRetry {
+    param(
+        [Parameter(Mandatory)][string]$Method,
+        [Parameter(Mandatory)][string]$Uri,
+        [Parameter(Mandatory)][hashtable]$Headers,
+        $Body,
+        [int]$MaxAttempts = 4
+    )
+    for ($i = 1; $i -le $MaxAttempts; $i++) {
+        try {
+            return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -Body $Body -ErrorAction Stop
+        }
+        catch {
+            $resp = $_.Exception.Response
+            $code = if ($resp) { [int]$resp.StatusCode } else { 0 }
+            if ($i -eq $MaxAttempts -or -not ($code -ge 500 -or $code -eq 429 -or $code -eq 0)) { throw }
+            Start-Sleep -Seconds ([int][Math]::Pow(2, $i) * 3)
+        }
+    }
+}
+
 
 ## RETIREVE ALL SOLUTIONS ($allSolutions)
 $packagesUrl = $baseUri + "/providers/Microsoft.SecurityInsights/contentProductPackages?api-version=2023-04-01-preview"
@@ -241,7 +264,7 @@ $deploymentUri = "$serverUrl/subscriptions/$SubscriptionId/resourceGroups/$Resou
 # Execute the deployment with error handling
 try {
     Write-Verbose "Deploying PowershellDownload analytics rule..."
-    Invoke-RestMethod -Method PUT -Uri $deploymentUri -Headers $authHeader -Body $deploymentBody
+    Invoke-ArmWithRetry -Method PUT -Uri $deploymentUri -Headers $authHeader -Body $deploymentBody
     Write-OutPut "✅ PowershellDownload analytics rule deployed successfully." 
 }
 catch {
@@ -349,7 +372,7 @@ $deploymentUri2 = "$serverUrl/subscriptions/$SubscriptionId/resourceGroups/$Reso
 # Execute the deployment with error handling
 try {
     Write-Verbose "Deploying RemoteRegistry analytics rule..."
-    Invoke-RestMethod -Method PUT -Uri $deploymentUri2 -Headers $authHeader -Body $deploymentBody2
+    Invoke-ArmWithRetry -Method PUT -Uri $deploymentUri2 -Headers $authHeader -Body $deploymentBody2
     Write-OutPut "✅ RemoteRegistry analytics rule deployed successfully." 
 }
 catch {
