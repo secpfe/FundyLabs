@@ -25,9 +25,12 @@ $location = $web01.Location
 $targets = @(@{ Vm = $web01Name; Ext = 'AzureMonitorLinuxAgent' })
 $targets += $vmNames | ForEach-Object { @{ Vm = $_; Ext = 'AzureMonitorWindowsAgent' } }
 
-$jobs = foreach ($t in $targets) {
+$jobs = @()
+foreach ($t in $targets) {
+    # Keep Write-Output out of the collected expression: `$jobs = foreach (...)` captures every
+    # statement's output, so the log lines would land in $jobs instead of the job stream.
     Write-Output "$(Get-Date -Format o) starting AMA install on $($t.Vm)"
-    Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $t.Vm `
+    $jobs += Set-AzVMExtension -ResourceGroupName $resourceGroupNameOps -VMName $t.Vm `
         -Name $t.Ext -Publisher "Microsoft.Azure.Monitor" -ExtensionType $t.Ext `
         -TypeHandlerVersion "1.0" -Location $location -AsJob
 }
