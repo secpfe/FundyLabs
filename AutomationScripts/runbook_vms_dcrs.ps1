@@ -21,9 +21,6 @@ $web01Name = "web01"
 $win10name="win10"
 $vmNames = @("mserv", "win10", "dc")
 
-# Get the resource group location
-$resourceGroup = Get-AzResourceGroup -Name $resourceGroupName
-$location = $resourceGroup.Location
 # Try to get workspace with provided/default name, fallback to discovery if not found
 try {
     $workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName $resourceGroupName -Name $workspaceName -ErrorAction Stop
@@ -38,6 +35,9 @@ try {
     Write-Output "Discovered workspace: $workspaceName"
 }
 # Prepare DCR details
+# A DCR must live in the same region as its destination workspace, which is not necessarily the
+# region of the resource group once the workspace has been recreated elsewhere.
+$location = $workspace.Location
 $workspaceResourceId = $workspace.ResourceId
 $workspaceId = $workspace.CustomerId
 
