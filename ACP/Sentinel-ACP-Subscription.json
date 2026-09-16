@@ -1,0 +1,63 @@
+{
+    "if": {
+        "not": {
+            "anyOf": [
+                {
+                    "field": "type",
+                    "equals": "Microsoft.OperationalInsights/workspaces"
+                },
+                {
+                    "allOf": [
+                        {
+                            "field": "type",
+                            "equals": "Microsoft.Web/serverFarms"
+                        },
+                        {
+                            "field": "Microsoft.Web/serverfarms/sku.name",
+                            "equals": "P0V4"
+                        }
+                    ]
+                },
+                {
+                    "allOf": [
+                        {
+                            "field": "type",
+                            "equals": "Microsoft.Web/sites"
+                        },
+                        {
+                            "field": "name",
+                            "like": "myVulWebApp-*"
+                        }                       
+                    ]
+                },
+                {
+                    "field": "type",
+                    "equals": "Microsoft.Web/connections"
+                },
+                {
+                    "field": "type",
+                    "equals": "Microsoft.Logic/workflows"
+                },
+                {
+                    "field": "type",
+                    "equals": "Microsoft.OperationsManagement/solutions"
+                },
+                {
+                    "field": "type",
+                    "equals": "Microsoft.Insights/workbooks"
+                },
+                {
+                    "field": "type",
+                    "equals": "Microsoft.Insights/dataCollectionRules"
+                },
+                {
+                    "field": "type",
+                    "equals": "Microsoft.Compute/virtualMachines/extensions"
+                }
+            ]
+        }
+    },
+    "then": {
+        "effect": "Deny"
+    }
+}

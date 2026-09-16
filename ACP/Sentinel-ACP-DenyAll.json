@@ -1,0 +1,13 @@
+{
+    "if": {
+        "allOf": [
+            {
+                "field": "type",
+                "notEquals": ""
+            }
+        ]
+    },
+    "then": {
+        "effect": "Deny"
+    }
+}

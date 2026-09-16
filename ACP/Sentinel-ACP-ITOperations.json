@@ -1,0 +1,19 @@
+{
+    "if": {
+        "not": {
+            "anyOf": [
+                {
+                    "field": "type",
+                    "equals": "Microsoft.Compute/virtualMachines/extensions"
+                },
+                {
+                    "field": "type",
+                    "equals": "Microsoft.Insights/diagnosticSettings"
+                }
+            ]
+        }
+    },
+    "then": {
+        "effect": "Deny"
+    }
+}
