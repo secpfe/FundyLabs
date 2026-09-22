@@ -3,8 +3,20 @@
         "not": {
             "anyOf": [
                 {
-                    "field": "type",
-                    "equals": "Microsoft.OperationalInsights/workspaces"
+                    "allOf": [
+                        {
+                            "field": "type",
+                            "equals": "Microsoft.OperationalInsights/workspaces"
+                        },
+                        {
+                            "field": "name",
+                            "like": "CyberSOCWS*"
+                        },
+                        {
+                            "field": "id",
+                            "contains": "/resourceGroups/CyberSOC/"
+                        }
+                    ]
                 },
                 {
                     "field": "type",

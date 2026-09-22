@@ -3,8 +3,20 @@
         "not": {
             "anyOf": [
                 {
-                    "field": "type",
-                    "equals": "Microsoft.OperationalInsights/workspaces"
+                    "allOf": [
+                        {
+                            "field": "type",
+                            "equals": "Microsoft.OperationalInsights/workspaces"
+                        },
+                        {
+                            "field": "name",
+                            "like": "CyberSOCWS*"
+                        },
+                        {
+                            "field": "id",
+                            "contains": "/resourceGroups/CyberSOC/"
+                        }
+                    ]
                 },
                 {
                     "allOf": [
@@ -13,8 +25,20 @@
                             "equals": "Microsoft.Web/serverFarms"
                         },
                         {
+                            "field": "name",
+                            "equals": "ASP-CyberSOC-b341"
+                        },
+                        {
+                            "field": "id",
+                            "contains": "/resourceGroups/ITOperations/"
+                        },
+                        {
                             "field": "Microsoft.Web/serverfarms/sku.name",
                             "equals": "P0V4"
+                        },
+                        {
+                            "field": "Microsoft.Web/serverfarms/sku.capacity",
+                            "lessOrEquals": 1
                         }
                     ]
                 },

@@ -400,6 +400,28 @@
                 "version": "1.0.0.0"
               }
             }
+          },
+          {
+            "type": "runbooks",
+            "apiVersion": "2019-06-01",
+            "name": "DeploySolutions",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+              "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
+            ],
+            "properties": {
+              "runbookType": "PowerShell72",
+              "logProgress": true,
+              "logVerbose": false,
+              "description": "[parameters('samplePowerShellRunbookDescription')]",
+              "runSettings": {
+                "runtimeVersion": "7.2"
+              },
+              "publishContentLink": {
+                "uri": "https://raw.githubusercontent.com/secpfe/FundyLabs/refs/heads/main/AutomationScripts/runbook_deploy_solutions.ps1",
+                "version": "1.0.0.0"
+              }
+            }
           }
         ]
       },
